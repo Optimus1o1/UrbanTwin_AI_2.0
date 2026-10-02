@@ -1,8 +1,11 @@
 import urllib.request
 import json
 import time
+import os
+import sys
 
-base = "http://127.0.0.1:8000"
+port = os.getenv("PORT", "8080" if "8080" in sys.argv else "8080")
+base = f"http://127.0.0.1:{port}"
 
 endpoints = [
     ("/", "GET"),
