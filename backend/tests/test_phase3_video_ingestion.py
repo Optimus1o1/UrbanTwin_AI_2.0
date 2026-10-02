@@ -289,3 +289,41 @@ def test_ssdlite_vehicle_detector():
     assert isinstance(results, list)
 
 
+def test_paper_plate_target_detection():
+    """
+    Validates that a handheld paper sheet or test plate card
+    is localized as a valid target candidate without artificial sedan truncation.
+    """
+    from app.services.video_ingestion_service import LiveVehicleRecognitionEngine
+    import cv2
+
+    engine = LiveVehicleRecognitionEngine("CAM_PAPER_UNIT_TEST")
+    frame = np.ones((540, 960, 3), dtype=np.uint8) * 35
+    # Draw simulated white paper sheet in center
+    cv2.rectangle(frame, (320, 160), (640, 340), (245, 245, 245), -1)
+    cv2.putText(frame, "WB02AK4921", (340, 260), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (10, 10, 10), 3)
+
+    _, dets = engine.process_frame(frame, "CAM_01", "Node A", "webcam", 30.0, "STREAMING")
+    assert len(dets) > 0
+    det = dets[0]
+    bx1, by1, bx2, by2 = det["bbox"]
+    assert bx1 < bx2 and by1 < by2
+    assert det["speed_kmh"] == 0.0
+
+
+def test_4_digit_numeric_plate_recognition():
+    """
+    Validates that 4-digit numeric test registrations (e.g. '4921')
+    are recognized and scored as valid test plates.
+    """
+    from app.services.ocr_image_service import recognize_plate_from_array
+    import cv2
+
+    card_4digit = np.ones((120, 300, 3), dtype=np.uint8) * 255
+    cv2.putText(card_4digit, "4921", (60, 75), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (0, 0, 0), 4)
+    plate_text, conf, engine_name, _, _ = recognize_plate_from_array(card_4digit, is_bgr=True)
+    assert plate_text == "4921"
+    assert conf >= 0.70
+
+
+

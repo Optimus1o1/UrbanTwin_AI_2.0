@@ -181,8 +181,8 @@ def _disambiguate_plate_text(candidate: str) -> str:
 
     # If first 2 chars form an Indian state or are both letters:
     if chars[0].isalpha() and chars[1].isalpha():
-        # Standard full plates like KA01MJ5021 or DL08CA1990 (9 or 10 chars)
-        if len(chars) in (9, 10):
+        # Standard full plates like KA01MJ5021 or DL08CA1990 (10 chars)
+        if len(chars) == 10:
             if chars[2] in ALPHA_TO_DIGIT:
                 chars[2] = ALPHA_TO_DIGIT[chars[2]]
             if chars[3] in ALPHA_TO_DIGIT:
@@ -202,7 +202,32 @@ def _disambiguate_plate_text(candidate: str) -> str:
                 if chars[idx] in DIGIT_TO_ALPHA:
                     chars[idx] = DIGIT_TO_ALPHA[chars[idx]]
 
-        # Short or single-digit RTO plates like DL3CAY4921 or DL4C1234
+        # Short or single-digit RTO / single-series plates (9 chars, e.g. DL3CA1234 or WB02A1234)
+        elif len(chars) == 9:
+            if chars[2] in ALPHA_TO_DIGIT:
+                chars[2] = ALPHA_TO_DIGIT[chars[2]]
+
+            # If chars[4] is a letter, then index 3 and 4 are series letters (DL 3 CA 1234)
+            if chars[4].isalpha() or chars[4] in DIGIT_TO_ALPHA:
+                if chars[3] in DIGIT_TO_ALPHA:
+                    chars[3] = DIGIT_TO_ALPHA[chars[3]]
+                if chars[4] in DIGIT_TO_ALPHA:
+                    chars[4] = DIGIT_TO_ALPHA[chars[4]]
+            else:
+                # 2-digit RTO, 1 series letter (WB 02 A 1234)
+                if chars[3] in ALPHA_TO_DIGIT:
+                    chars[3] = ALPHA_TO_DIGIT[chars[3]]
+                if chars[4] in DIGIT_TO_ALPHA:
+                    chars[4] = DIGIT_TO_ALPHA[chars[4]]
+
+            # Registration digits (last 4) MUST be digits
+            for idx in range(len(chars) - 4, len(chars)):
+                if chars[idx] in ('O', 'D', 'Q'):
+                    chars[idx] = '0'
+                elif chars[idx] in ALPHA_TO_DIGIT:
+                    chars[idx] = ALPHA_TO_DIGIT[chars[idx]]
+
+        # Short single-digit RTO plates like DL4C1234 (7 or 8 chars)
         elif len(chars) >= 7 and chars[2].isdigit():
             # Last 4 digits
             for idx in range(len(chars) - 4, len(chars)):
@@ -231,34 +256,39 @@ def _extract_plate_tokens(raw_str: str) -> List[Tuple[str, float]]:
     if cleaned.isdigit() and len(cleaned) > 4:
         return []
 
-    tokens = []
+    token_map: Dict[str, float] = {}
 
-    # Strip 'IND' if present at beginning of HSRP plate
-    if cleaned.startswith('IND') and len(cleaned) >= 7:
-        ind_stripped = cleaned[3:]
-        tokens.append((ind_stripped, 1.25))
+    cleaned_candidates = [cleaned]
+    dis = _disambiguate_plate_text(cleaned)
+    if dis != cleaned:
+        cleaned_candidates.append(dis)
 
-    # Test raw cleaned
-    tokens.append((cleaned, 1.0))
+    for cand_str in cleaned_candidates:
+        # Strip 'IND' if present at beginning of HSRP plate
+        if cand_str.startswith('IND') and len(cand_str) >= 7:
+            ind_stripped = cand_str[3:]
+            token_map[ind_stripped] = max(token_map.get(ind_stripped, 0.0), 1.25)
 
-    # Regex substring search across the string
-    for regex, boost in EXTRACTION_PATTERNS:
-        matches = regex.findall(cleaned)
-        for m in matches:
-            if isinstance(m, tuple):
-                m = m[0]
-            if len(m) >= 4 and m not in [t[0] for t in tokens]:
-                tokens.append((m, boost))
+        token_map[cand_str] = max(token_map.get(cand_str, 0.0), 1.0)
 
-    # Also add disambiguated versions
-    disambiguated_tokens = []
-    for tok, boost in tokens:
-        dis = _disambiguate_plate_text(tok)
-        disambiguated_tokens.append((tok, boost))
-        if dis != tok:
-            disambiguated_tokens.append((dis, boost * 1.15))
+        # Regex substring search across the string
+        for regex, boost in EXTRACTION_PATTERNS:
+            matches = regex.findall(cand_str)
+            for m in matches:
+                if isinstance(m, tuple):
+                    m = m[0]
+                if len(m) >= 4:
+                    token_map[m] = max(token_map.get(m, 0.0), boost)
 
-    return disambiguated_tokens
+    # Also add disambiguated versions of extracted tokens
+    final_tokens: List[Tuple[str, float]] = []
+    for tok, boost in token_map.items():
+        final_tokens.append((tok, boost))
+        dis_tok = _disambiguate_plate_text(tok)
+        if dis_tok != tok:
+            final_tokens.append((dis_tok, boost * 1.15))
+
+    return final_tokens
 
 
 def _score_candidate(candidate: str, raw_conf: float) -> float:
@@ -292,8 +322,10 @@ def _score_candidate(candidate: str, raw_conf: float) -> float:
     # Strongly reward strings with both letters and numbers
     if has_alpha and has_digit:
         score *= 1.5
+    elif has_digit and len(candidate) == 4:
+        score *= 1.15  # Support 4-digit numeric test registrations (e.g. '4921')
     else:
-        score *= 0.40  # Penalize purely alphabetic or purely numeric strings
+        score *= 0.40  # Penalize purely alphabetic or irregular numeric strings
 
     # Check if Bharat Series plate: e.g. 22BH6517A
     is_bharat = bool(re.match(r'^[0-9]{2}BH[0-9]{1,4}[A-Z]{1,2}$', candidate))
@@ -316,6 +348,8 @@ def _score_candidate(candidate: str, raw_conf: float) -> float:
         score *= 1.3
     elif len(candidate) == 6:
         score *= 0.9
+    elif len(candidate) == 4:
+        score *= 0.85
     elif len(candidate) <= 5:
         score *= 0.45
 
@@ -474,6 +508,8 @@ def _enhance_crop_variants(crop_rgb: np.ndarray) -> List[np.ndarray]:
     Produces enhancement representations for plate crop:
     1. Normalized RGB
     2. CLAHE contrast equalization (for shadowed or glare-affected plates)
+    3. Otsu high-contrast binarization (for paper-written numbers and faint plates)
+    4. Adaptive Gaussian thresholding (for gradient shadows on handheld paper)
     """
     normalized = _normalize_crop_dimensions(crop_rgb)
     variants = [normalized]
@@ -485,6 +521,16 @@ def _enhance_crop_variants(crop_rgb: np.ndarray) -> List[np.ndarray]:
         clahe = cv2.createCLAHE(clipLimit=2.2, tileGridSize=(8, 8))
         clahe_enhanced = clahe.apply(gray)
         variants.append(cv2.cvtColor(clahe_enhanced, cv2.COLOR_GRAY2RGB))
+
+        # Otsu threshold variant: dramatically boosts pen/pencil contrast against paper
+        _, otsu_bin = cv2.threshold(clahe_enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        variants.append(cv2.cvtColor(otsu_bin, cv2.COLOR_GRAY2RGB))
+
+        # Adaptive Gaussian threshold variant: handles gradient shadows on paper/plates
+        adaptive_bin = cv2.adaptiveThreshold(
+            clahe_enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 25, 9
+        )
+        variants.append(cv2.cvtColor(adaptive_bin, cv2.COLOR_GRAY2RGB))
     except Exception:
         pass
 

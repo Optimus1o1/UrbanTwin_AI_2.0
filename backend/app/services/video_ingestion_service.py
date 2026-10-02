@@ -294,7 +294,33 @@ class LiveVehicleRecognitionEngine:
         except Exception:
             pass
 
-        # 3. Motion segmentation (MOG2)
+        # 3. Document / Plate Card Saliency (for handheld test cards, test sheets & isolated plates)
+        try:
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            card_mask = cv2.inRange(hsv, np.array([0, 0, 140]), np.array([180, 55, 255]))
+            yellow_mask = cv2.inRange(hsv, np.array([15, 60, 100]), np.array([35, 255, 255]))
+            combined_card = cv2.bitwise_or(card_mask, yellow_mask)
+
+            kernel_card = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 11))
+            closed_card = cv2.morphologyEx(combined_card, cv2.MORPH_CLOSE, kernel_card)
+            card_cnts, _ = cv2.findContours(closed_card, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            for cc in card_cnts:
+                cx_c, cy_c, cw_c, ch_c = cv2.boundingRect(cc)
+                car = cw_c / float(max(1, ch_c))
+                c_area = cw_c * ch_c
+                # Match rectangular paper sheet or plate held in front of camera
+                if (1.2 <= car <= 5.5) and (5000 <= c_area <= 190000) and (cw_c >= 70) and (ch_c >= 40):
+                    if cw_c < 860 and ch_c < 470:
+                        candidates.append({
+                            "box": (cx_c, cy_c, cw_c, ch_c),
+                            "label": "Plate / Test Target",
+                            "confidence": 0.94,
+                            "source": "paper_target"
+                        })
+        except Exception:
+            pass
+
+        # 4. Motion segmentation (MOG2)
         try:
             blurred = cv2.GaussianBlur(gray, (5, 5), 0)
             fg_mask = self.bg_subtractor.apply(blurred)
@@ -318,7 +344,7 @@ class LiveVehicleRecognitionEngine:
         except Exception:
             pass
 
-        # 4. Vehicle body saliency (Otsu threshold on gray)
+        # 5. Vehicle body saliency (Otsu threshold on gray)
         try:
             _, otsu_th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
             kernel_v = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 7))
@@ -339,7 +365,7 @@ class LiveVehicleRecognitionEngine:
         except Exception:
             pass
 
-        # 5. Viewfinder Reticle Fallback if no targets detected
+        # 6. Viewfinder Reticle Fallback if no targets detected
         if not candidates:
             cx, cy = w // 2, h // 2
             bw, bh = 360, 200
@@ -350,9 +376,9 @@ class LiveVehicleRecognitionEngine:
                 "source": "reticle"
             }]
 
-        # 6. Priority Non-Maximum Suppression (prioritize SSDLite deep detections)
+        # 7. Priority Non-Maximum Suppression (prioritize SSDLite deep detections & paper targets)
         def _sort_key(c):
-            src_score = 3 if c.get("source") == "ssdlite" else (2 if c.get("source") == "plate_edge" else 1)
+            src_score = 4 if c.get("source") == "ssdlite" else (3 if c.get("source") == "paper_target" else (2 if c.get("source") == "plate_edge" else 1))
             b = c["box"]
             return (src_score, b[2] * b[3])
 
@@ -402,7 +428,7 @@ class LiveVehicleRecognitionEngine:
         if self.prev_gray is not None and self.prev_gray.shape == curr_gray.shape:
             try:
                 roi_gray = curr_gray[by:by + bh, bx:bx + bw]
-                corners = cv2.goodFeaturesToTrack(roi_gray, maxCorners=16, qualityLevel=0.03, minDistance=5)
+                corners = cv2.goodFeaturesToTrack(roi_gray, maxCorners=24, qualityLevel=0.02, minDistance=4)
                 if corners is not None and len(corners) > 0:
                     curr_pts = corners + np.array([bx, by], dtype=np.float32)
                     prev_pts, status, _ = cv2.calcOpticalFlowPyrLK(
@@ -549,9 +575,10 @@ class LiveVehicleRecognitionEngine:
                     conf = fallback_c
                     ocr_locked = False
 
-            # Prioritize bumper crop where license plates reside
+            # Prioritize bumper crop where license plates reside (only for full vehicle bodies)
             if crop_to_submit is None and crop.size > 0:
-                if bh > 75:
+                is_full_vehicle = (cand.get("source") == "ssdlite") and (v_type not in ["Vehicle / Target Zone", "Sedan / Passenger Car"] or bh > 110)
+                if is_full_vehicle and bh > 95:
                     bumper_y1 = max(0, int(bh * 0.48))
                     crop_to_submit = crop[bumper_y1:bh, :].copy()
                 else:
@@ -589,8 +616,8 @@ class LiveVehicleRecognitionEngine:
 
         # 4. Dispatch next OCR inference job if worker is idle
         if self.pending_ocr_future is None and (now - self.last_ocr_submission_time >= 0.20):
-            # Center reticle zone (320x140) where user targets plates
-            center_crop = frame[max(0, h // 2 - 70):min(h, h // 2 + 70), max(0, w // 2 - 160):min(w, w // 2 + 160)]
+            # Center reticle zone (360x180) precisely matching the user's on-screen reticle
+            center_crop = frame[max(0, h // 2 - 90):min(h, h // 2 + 90), max(0, w // 2 - 180):min(w, w // 2 + 180)]
             if self.frame_index % 2 == 0 and center_crop.size > 0:
                 self.pending_ocr_future = self.ocr_executor.submit(_ocr_worker_task, center_crop.copy(), 999)
                 self.last_ocr_submission_time = now
@@ -663,7 +690,7 @@ class LiveVehicleRecognitionEngine:
 
         cv2.drawMarker(frame, (cx, cy), reticle_color, markerType=cv2.MARKER_CROSS, markerSize=12, thickness=1)
 
-        label = f"ANPR LOCKED: {self.last_recognized_plate} ({int(self.last_recognized_conf * 100)}%)" if is_locked else "AIM AT NUMBER PLATE OR VEHICLE"
+        label = f"ANPR LOCKED: {self.last_recognized_plate} ({int(self.last_recognized_conf * 100)}%)" if is_locked else "AIM AT NUMBER PLATE OR TEST CARD"
         (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.32, 1)
         bx1 = cx - tw // 2 - 8
         by1 = ry1 - th - 8
@@ -691,15 +718,16 @@ class LiveVehicleRecognitionEngine:
         vh = y2 - y1
         corner_len = max(10, min(24, vw // 4))
 
+        is_paper_target = (v_type in ["Plate / Test Target", "Vehicle / Target Zone"])
         if speed == 0.0:
             alert_color = (200, 180, 0)
-            speed_str = "0.0 km/h • STATIONARY"
+            speed_str = "0.0 km/h • STATIONARY (TEST TARGET)" if is_paper_target else "0.0 km/h • STATIONARY"
         elif speed > 55.0:
             alert_color = (0, 70, 255)
             speed_str = f"{speed} km/h • SPEED ALERT"
         else:
             alert_color = (0, 255, 180)
-            speed_str = f"{speed} km/h • FLOW NORMAL"
+            speed_str = f"{speed} km/h • IN MOTION" if is_paper_target else f"{speed} km/h • FLOW NORMAL"
 
         cv2.rectangle(frame, (x1, y1), (x2, y2), (alert_color[0] // 3, alert_color[1] // 3, alert_color[2] // 3), 1)
 
