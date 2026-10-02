@@ -204,7 +204,7 @@ async function loadInitialDashboardData() {
 function initLeafletMaps() {
   if (typeof L === 'undefined') return;
 
-  const bangaloreCenter = [12.9450, 77.6250];
+  const kolkataCenter = [22.5726, 88.3639];
   const osmUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   const osmAttr = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" class="text-cyan-400">OpenStreetMap</a> contributors';
 
@@ -212,7 +212,7 @@ function initLeafletMaps() {
   const cityEl = document.getElementById('city-map');
   if (cityEl) {
     cityEl.classList.add('dark-map-tiles');
-    cityMap = L.map('city-map', { zoomControl: true }).setView(bangaloreCenter, 12);
+    cityMap = L.map('city-map', { zoomControl: true }).setView(kolkataCenter, 12);
     L.tileLayer(osmUrl, {
       maxZoom: 19,
       attribution: osmAttr
@@ -223,7 +223,7 @@ function initLeafletMaps() {
   const trajEl = document.getElementById('trajectory-map');
   if (trajEl) {
     trajEl.classList.add('dark-map-tiles');
-    trajectoryMap = L.map('trajectory-map', { zoomControl: true }).setView(bangaloreCenter, 12);
+    trajectoryMap = L.map('trajectory-map', { zoomControl: true }).setView(kolkataCenter, 12);
     L.tileLayer(osmUrl, {
       maxZoom: 19,
       attribution: osmAttr
@@ -234,7 +234,7 @@ function initLeafletMaps() {
   const corrEl = document.getElementById('corridor-map');
   if (corrEl && !corridorMap) {
     corrEl.classList.add('dark-map-tiles');
-    corridorMap = L.map('corridor-map', { zoomControl: true }).setView(bangaloreCenter, 13);
+    corridorMap = L.map('corridor-map', { zoomControl: true }).setView(kolkataCenter, 13);
     L.tileLayer(osmUrl, {
       maxZoom: 19,
       attribution: osmAttr
@@ -755,11 +755,11 @@ function drawCongestionCorridors(factor) {
   if (!macroLayerStates.corridors) return;
 
   const corridors = [
-    { name: 'MG Road - Trinity Arterial', coords: [[12.9716, 77.5946], [12.9784, 77.6408]], dense: false },
-    { name: 'Indiranagar 100ft Flyover', coords: [[12.9784, 77.6408], [12.9352, 77.6245]], dense: factor > 0.6 },
-    { name: 'Koramangala Financial Transit', coords: [[12.9352, 77.6245], [12.9279, 77.6271]], dense: factor > 0.45 },
-    { name: 'Outer Ring Road Expressway', coords: [[12.9279, 77.6271], [12.8452, 77.6602]], dense: factor > 0.55 },
-    { name: 'West River Gateway Viaduct', coords: [[12.9611, 77.5500], [12.9716, 77.5946]], dense: false }
+    { name: 'Maa Flyover High-Speed Viaduct', coords: [[22.5438, 88.3683], [22.5396, 88.3965]], dense: false },
+    { name: 'EM Bypass North-South Expressway', coords: [[22.5100, 88.3910], [22.5800, 88.4100]], dense: factor > 0.6 },
+    { name: 'Park Street Commercial Arterial', coords: [[22.5535, 88.3512], [22.5480, 88.3680]], dense: factor > 0.45 },
+    { name: 'Strand Road - Riverfront Viaduct', coords: [[22.5600, 88.3400], [22.5851, 88.3468]], dense: false },
+    { name: 'Sector V to New Town Expressway', coords: [[22.5735, 88.4331], [22.5905, 88.4744]], dense: factor > 0.55 }
   ];
 
   corridors.forEach(c => {

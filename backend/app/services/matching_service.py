@@ -15,11 +15,11 @@ TRAJECTORIES_DB: Dict[str, Dict[str, Any]] = {
         "is_blacklisted": False,
         "blacklist_reason": None,
         "waypoints_raw": [
-            {"camera_id": "CAM_01", "name": "MG Road - Trinity Junction", "time": "10:02:15", "lat": 12.9756, "lng": 77.6067, "x_3d": -15.0, "z_3d": -10.0, "speed": 48.2, "heading": "Eastbound"},
-            {"camera_id": "CAM_02", "name": "Indiranagar 100ft Express Corridor", "time": "10:07:42", "lat": 12.9784, "lng": 77.6408, "x_3d": 0.0, "z_3d": -25.0, "speed": 58.5, "heading": "North-East"},
-            {"camera_id": "CAM_03", "name": "Koramangala Sony World Crossing", "time": "10:14:18", "lat": 12.9352, "lng": 77.6245, "x_3d": 18.0, "z_3d": -8.0, "speed": 64.0, "heading": "Southbound"}, # Speeding (limit 60)
-            {"camera_id": "CAM_05", "name": "Outer Ring Road - Bellandur Tech Hub", "time": "10:22:50", "lat": 12.9260, "lng": 77.6762, "x_3d": 5.0, "z_3d": 20.0, "speed": 44.1, "heading": "South-East"},
-            {"camera_id": "CAM_06", "name": "Electronic City Tollway Expressway", "time": "10:33:10", "lat": 12.8452, "lng": 77.6602, "x_3d": 25.0, "z_3d": 18.0, "speed": 52.0, "heading": "Southbound"}
+            {"camera_id": "CAM_04", "name": "Howrah Bridge - Strand Road Crossing", "time": "10:02:15", "lat": 22.5851, "lng": 88.3468, "x_3d": -25.0, "z_3d": -15.0, "speed": 38.2, "heading": "Eastbound"},
+            {"camera_id": "CAM_01", "name": "Park Street - Chowringhee Crossing", "time": "10:08:42", "lat": 22.5535, "lng": 88.3512, "x_3d": -10.0, "z_3d": -5.0, "speed": 46.5, "heading": "South-East"},
+            {"camera_id": "CAM_03", "name": "Maa Flyover - Park Circus 7-Point", "time": "10:15:18", "lat": 22.5438, "lng": 88.3683, "x_3d": 0.0, "z_3d": 5.0, "speed": 64.0, "heading": "Eastbound"}, # Speeding (limit 60)
+            {"camera_id": "CAM_02", "name": "EM Bypass - Science City Junction", "time": "10:22:50", "lat": 22.5396, "lng": 88.3965, "x_3d": 12.0, "z_3d": 15.0, "speed": 52.1, "heading": "North-East"},
+            {"camera_id": "CAM_05", "name": "Salt Lake Sector V - College More", "time": "10:33:10", "lat": 22.5735, "lng": 88.4331, "x_3d": 25.0, "z_3d": 22.0, "speed": 48.0, "heading": "North-East"}
         ]
     },
     "3ABC456": {
@@ -29,9 +29,9 @@ TRAJECTORIES_DB: Dict[str, Dict[str, Any]] = {
         "is_blacklisted": True,
         "blacklist_reason": "Warrant #W-8891: Suspected Commercial Smuggling / Evading Toll Audit",
         "waypoints_raw": [
-            {"camera_id": "CAM_04", "name": "West River Crossing Flyover", "time": "11:15:00", "lat": 12.9550, "lng": 77.5680, "x_3d": -25.0, "z_3d": 15.0, "speed": 68.4, "heading": "Eastbound"},
-            {"camera_id": "CAM_01", "name": "MG Road - Trinity Junction", "time": "11:21:30", "lat": 12.9756, "lng": 77.6067, "x_3d": -15.0, "z_3d": -10.0, "speed": 52.0, "heading": "Eastbound"},
-            {"camera_id": "CAM_03", "name": "Koramangala Sony World Crossing", "time": "11:28:15", "lat": 12.9352, "lng": 77.6245, "x_3d": 18.0, "z_3d": -8.0, "speed": 38.2, "heading": "Southbound"}
+            {"camera_id": "CAM_04", "name": "Howrah Bridge - Strand Road Crossing", "time": "11:15:00", "lat": 22.5851, "lng": 88.3468, "x_3d": -25.0, "z_3d": -15.0, "speed": 48.4, "heading": "Southbound"},
+            {"camera_id": "CAM_01", "name": "Park Street - Chowringhee Crossing", "time": "11:21:30", "lat": 22.5535, "lng": 88.3512, "x_3d": -10.0, "z_3d": -5.0, "speed": 44.0, "heading": "Eastbound"},
+            {"camera_id": "CAM_03", "name": "Maa Flyover - Park Circus 7-Point", "time": "11:28:15", "lat": 22.5438, "lng": 88.3683, "x_3d": 0.0, "z_3d": 5.0, "speed": 58.2, "heading": "Eastbound"}
         ]
     },
     "KA01MJ5021": {
@@ -41,9 +41,9 @@ TRAJECTORIES_DB: Dict[str, Dict[str, Any]] = {
         "is_blacklisted": False,
         "blacklist_reason": None,
         "waypoints_raw": [
-            {"camera_id": "CAM_06", "name": "Electronic City Tollway Expressway", "time": "09:12:00", "lat": 12.8452, "lng": 77.6602, "x_3d": 25.0, "z_3d": 18.0, "speed": 54.0, "heading": "Northbound"},
-            {"camera_id": "CAM_05", "name": "Outer Ring Road - Bellandur Tech Hub", "time": "09:22:45", "lat": 12.9260, "lng": 77.6762, "x_3d": 5.0, "z_3d": 20.0, "speed": 46.5, "heading": "North-West"},
-            {"camera_id": "CAM_02", "name": "Indiranagar 100ft Express Corridor", "time": "09:34:10", "lat": 12.9784, "lng": 77.6408, "x_3d": 0.0, "z_3d": -25.0, "speed": 49.0, "heading": "North"}
+            {"camera_id": "CAM_06", "name": "New Town Major Arterial - Biswa Bangla Gate", "time": "09:12:00", "lat": 22.5905, "lng": 88.4744, "x_3d": 30.0, "z_3d": 25.0, "speed": 54.0, "heading": "South-West"},
+            {"camera_id": "CAM_05", "name": "Salt Lake Sector V - College More", "time": "09:22:45", "lat": 22.5735, "lng": 88.4331, "x_3d": 25.0, "z_3d": 22.0, "speed": 46.5, "heading": "South-West"},
+            {"camera_id": "CAM_02", "name": "EM Bypass - Science City Junction", "time": "09:34:10", "lat": 22.5396, "lng": 88.3965, "x_3d": 12.0, "z_3d": 15.0, "speed": 49.0, "heading": "West"}
         ]
     },
     "V1023": {
@@ -53,9 +53,9 @@ TRAJECTORIES_DB: Dict[str, Dict[str, Any]] = {
         "is_blacklisted": False,
         "blacklist_reason": None,
         "waypoints_raw": [
-            {"camera_id": "CAM_01", "name": "MG Road - Trinity Junction", "time": "10:02:01", "lat": 12.9756, "lng": 77.6067, "x_3d": -15.0, "z_3d": -10.0, "speed": 48.2, "heading": "Eastbound"},
-            {"camera_id": "CAM_03", "name": "Koramangala Sony World Crossing", "time": "10:07:34", "lat": 12.9352, "lng": 77.6245, "x_3d": 18.0, "z_3d": -8.0, "speed": 42.0, "heading": "Southbound"},
-            {"camera_id": "CAM_05", "name": "Outer Ring Road - Bellandur Tech Hub", "time": "10:14:12", "lat": 12.9260, "lng": 77.6762, "x_3d": 5.0, "z_3d": 20.0, "speed": 39.5, "heading": "South-East"}
+            {"camera_id": "CAM_01", "name": "Park Street - Chowringhee Crossing", "time": "10:02:01", "lat": 22.5535, "lng": 88.3512, "x_3d": -10.0, "z_3d": -5.0, "speed": 42.2, "heading": "Eastbound"},
+            {"camera_id": "CAM_03", "name": "Maa Flyover - Park Circus 7-Point", "time": "10:07:34", "lat": 22.5438, "lng": 88.3683, "x_3d": 0.0, "z_3d": 5.0, "speed": 52.0, "heading": "Eastbound"},
+            {"camera_id": "CAM_02", "name": "EM Bypass - Science City Junction", "time": "10:14:12", "lat": 22.5396, "lng": 88.3965, "x_3d": 12.0, "z_3d": 15.0, "speed": 48.5, "heading": "South-East"}
         ]
     }
 }
@@ -68,9 +68,9 @@ TRAJECTORIES_DB["V4089"] = {
     "is_blacklisted": False,
     "blacklist_reason": None,
     "waypoints_raw": [
-        {"camera_id": "CAM_02", "name": "Indiranagar 100ft Express Corridor", "time": "10:11:05", "lat": 12.9784, "lng": 77.6408, "x_3d": 0.0, "z_3d": -25.0, "speed": 64.1, "heading": "North-East"},
-        {"camera_id": "CAM_04", "name": "West River Crossing Flyover", "time": "10:18:22", "lat": 12.9550, "lng": 77.5680, "x_3d": -25.0, "z_3d": 15.0, "speed": 58.0, "heading": "Westbound"},
-        {"camera_id": "CAM_06", "name": "Electronic City Tollway Expressway", "time": "10:25:50", "lat": 12.8452, "lng": 77.6602, "x_3d": 25.0, "z_3d": 18.0, "speed": 52.3, "heading": "Southbound"}
+        {"camera_id": "CAM_04", "name": "Howrah Bridge - Strand Road Crossing", "time": "10:11:05", "lat": 22.5851, "lng": 88.3468, "x_3d": -25.0, "z_3d": -15.0, "speed": 34.1, "heading": "Eastbound"},
+        {"camera_id": "CAM_01", "name": "Park Street - Chowringhee Crossing", "time": "10:18:22", "lat": 22.5535, "lng": 88.3512, "x_3d": -10.0, "z_3d": -5.0, "speed": 45.0, "heading": "Eastbound"},
+        {"camera_id": "CAM_03", "name": "Maa Flyover - Park Circus 7-Point", "time": "10:25:50", "lat": 22.5438, "lng": 88.3683, "x_3d": 0.0, "z_3d": 5.0, "speed": 52.3, "heading": "Eastbound"}
     ]
 }
 

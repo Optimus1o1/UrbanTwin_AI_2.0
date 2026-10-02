@@ -25,12 +25,12 @@ from app.models.schemas import (
 
 # Reference Camera Coordinates
 CAMERA_COORDINATES: Dict[str, Dict[str, Any]] = {
-    "CAM_01": {"name": "MG Road - Trinity Junction", "lat": 12.9725, "lng": 77.6180, "sector": "Commercial Core", "sensitive": True},
-    "CAM_02": {"name": "Indiranagar 100ft Express", "lat": 12.9784, "lng": 77.6408, "sector": "East Transit Hub", "sensitive": False},
-    "CAM_03": {"name": "Koramangala Sony World Crossing", "lat": 12.9352, "lng": 77.6245, "sector": "Financial & Tech Core", "sensitive": True},
-    "CAM_04": {"name": "West River Crossing Flyover", "lat": 12.9510, "lng": 77.5850, "sector": "Government & Embassy Zone", "sensitive": True},
-    "CAM_05": {"name": "Outer Ring Road - Bellandur Tech Hub", "lat": 12.9260, "lng": 77.6762, "sector": "South-East Tech Corridor", "sensitive": False},
-    "CAM_06": {"name": "Electronic City Tollway Interchange", "lat": 12.8452, "lng": 77.6602, "sector": "South Tech Tollway", "sensitive": False}
+    "CAM_01": {"name": "Park Street - Chowringhee Crossing", "lat": 22.5535, "lng": 88.3512, "sector": "Commercial Core", "sensitive": True},
+    "CAM_02": {"name": "EM Bypass - Science City Junction", "lat": 22.5396, "lng": 88.3965, "sector": "Eastern Expressway Hub", "sensitive": False},
+    "CAM_03": {"name": "Maa Flyover - Park Circus 7-Point", "lat": 22.5438, "lng": 88.3683, "sector": "Central Flyover Core", "sensitive": True},
+    "CAM_04": {"name": "Howrah Bridge - Strand Road Crossing", "lat": 22.5851, "lng": 88.3468, "sector": "River Gateway & Rail Transit", "sensitive": True},
+    "CAM_05": {"name": "Salt Lake Sector V - College More", "lat": 22.5735, "lng": 88.4331, "sector": "IT & High-Tech Corridor", "sensitive": False},
+    "CAM_06": {"name": "New Town Major Arterial - Biswa Bangla Gate", "lat": 22.5905, "lng": 88.4744, "sector": "Smart City North-East Hub", "sensitive": False}
 }
 
 # Haversine distance helper (km)
@@ -83,14 +83,14 @@ class BehavioralRadarService:
                     }
                 ),
                 cameras_involved=["CAM_01", "CAM_06"],
-                camera_names=["MG Road - Trinity Junction", "Electronic City Tollway Interchange"],
-                sector="South Corridor Cross-Sector",
+                camera_names=["Park Street - Chowringhee Crossing", "New Town Major Arterial - Biswa Bangla Gate"],
+                sector="East-West Cross-Sector",
                 radar_angle_deg=135.0,
                 radar_distance_km=6.8,
-                route_coordinates=[[12.9725, 77.6180], [12.8452, 77.6602]],
+                route_coordinates=[[22.5535, 88.3512], [22.5905, 88.4744]],
                 detection_timestamp=(now - timedelta(minutes=4)).strftime("%H:%M:%S"),
                 intercept_recommended=True,
-                suggested_action="Immediate dual-sector alert. Flag both clone targets for tactical intercept at Electronic City Toll Plaza and Trinity Exit.",
+                suggested_action="Immediate dual-sector alert. Flag both clone targets for tactical intercept at Biswa Bangla Gate and Park Street Exit.",
                 status="ACTIVE_TRACKING"
             ),
             # 2. Tactical Convoy / Following Behavior Threat
@@ -99,34 +99,34 @@ class BehavioralRadarService:
                 threat_type=BehavioralThreatType.TACTICAL_CONVOY,
                 threat_title="Synchronized Tactical Convoy / Unregistered Shadow Following",
                 severity=BehavioralThreatSeverity.HIGH,
-                primary_plate="KA01MH7701",
+                primary_plate="WB06EH7701",
                 primary_vehicle_desc="Ford Endeavour SUV (Matte Black)",
-                secondary_plate="KA01MH7702",
+                secondary_plate="WB06EH7702",
                 secondary_vehicle_desc="Toyota Fortuner SUV (Dark Tinted)",
                 evidence=BehavioralEvidence(
                     metric_name="Disjoint Node Headway Correlation",
                     observed_value="7.4s constant headway (StdDev: 0.8s)",
                     baseline_threshold="Random Urban Follow Headway StdDev: > 8.5s",
-                    physical_discrepancy="Paired vehicles maintained identical vector maneuvers across 3 disjoint junctions (CAM_01 -> CAM_02 -> CAM_05) spanning 11.2 km without separation.",
+                    physical_discrepancy="Paired vehicles maintained identical vector maneuvers across 3 disjoint junctions (CAM_01 -> CAM_03 -> CAM_02) spanning 8.6 km without separation.",
                     anomaly_z_score=4.6,
                     model_confidence=0.95,
                     details={
                         "tracked_nodes_count": 3,
                         "mean_headway_seconds": 7.4,
                         "headway_stddev": 0.8,
-                        "formation_distance_km": 11.2,
-                        "node_sequence": ["CAM_01", "CAM_02", "CAM_05"]
+                        "formation_distance_km": 8.6,
+                        "node_sequence": ["CAM_01", "CAM_03", "CAM_02"]
                     }
                 ),
-                cameras_involved=["CAM_01", "CAM_02", "CAM_05"],
-                camera_names=["MG Road - Trinity Junction", "Indiranagar 100ft Express", "Outer Ring Road - Bellandur Tech Hub"],
-                sector="East Transit & Tech Hub",
+                cameras_involved=["CAM_01", "CAM_03", "CAM_02"],
+                camera_names=["Park Street - Chowringhee Crossing", "Maa Flyover - Park Circus 7-Point", "EM Bypass - Science City Junction"],
+                sector="Central & Eastern Corridor",
                 radar_angle_deg=45.0,
                 radar_distance_km=4.2,
-                route_coordinates=[[12.9725, 77.6180], [12.9784, 77.6408], [12.9260, 77.6762]],
+                route_coordinates=[[22.5535, 88.3512], [22.5438, 88.3683], [22.5396, 88.3965]],
                 detection_timestamp=(now - timedelta(minutes=9)).strftime("%H:%M:%S"),
                 intercept_recommended=True,
-                suggested_action="Alert highway intercept units. Monitor paired convoy at Bellandur tech corridor for coordinated egress or illicit payload transfer.",
+                suggested_action="Alert highway intercept units. Monitor paired convoy along EM Bypass for coordinated egress or illicit payload transfer.",
                 status="ACTIVE_TRACKING"
             ),
             # 3. Surveillance Loitering Vector Threat
@@ -135,7 +135,7 @@ class BehavioralRadarService:
                 threat_type=BehavioralThreatType.SURVEILLANCE_LOITERING,
                 threat_title="Circuitous Surveillance Vector / High-Security Infrastructure Circling",
                 severity=BehavioralThreatSeverity.HIGH,
-                primary_plate="KA05NB9944",
+                primary_plate="WB20BC9944",
                 primary_vehicle_desc="Panel Cargo Van (Tinted Windows)",
                 secondary_plate=None,
                 secondary_vehicle_desc=None,
@@ -143,25 +143,25 @@ class BehavioralRadarService:
                     metric_name="Graph Entropy & Loop Recurrence Rate",
                     observed_value="4 Repetitive Closed Loops in 35 min",
                     baseline_threshold="Commuter Loop Expectation: 0 Loops (Entropy > 0.85)",
-                    physical_discrepancy="Vehicle repeated 4 closed-circuit loops around West River Crossing Flyover and Koramangala Government Facility with 0 destination progress.",
+                    physical_discrepancy="Vehicle repeated 4 closed-circuit loops around Howrah Bridge Strand Road and Park Street government facility with 0 destination progress.",
                     anomaly_z_score=4.1,
                     model_confidence=0.92,
                     details={
                         "loop_count": 4,
                         "dwell_time_minutes": 35.0,
                         "net_displacement_km": 0.8,
-                        "sensitive_zone": "Embassy Enclave & Government Corridor"
+                        "sensitive_zone": "High Court & Riverfront Commercial Corridor"
                     }
                 ),
-                cameras_involved=["CAM_04", "CAM_03", "CAM_04", "CAM_03"],
-                camera_names=["West River Crossing Flyover", "Koramangala Sony World Crossing"],
-                sector="Government & Embassy Corridor",
+                cameras_involved=["CAM_04", "CAM_01", "CAM_04", "CAM_01"],
+                camera_names=["Howrah Bridge - Strand Road Crossing", "Park Street - Chowringhee Crossing"],
+                sector="Riverfront & Commercial Corridor",
                 radar_angle_deg=225.0,
                 radar_distance_km=3.1,
-                route_coordinates=[[12.9510, 77.5850], [12.9352, 77.6245], [12.9510, 77.5850]],
+                route_coordinates=[[22.5851, 88.3468], [22.5535, 88.3512], [22.5851, 88.3468]],
                 detection_timestamp=(now - timedelta(minutes=16)).strftime("%H:%M:%S"),
                 intercept_recommended=True,
-                suggested_action="Dispatch perimeter patrol unit to West River bridgehead. Execute ID verification for suspicious surveillance reconnaissance.",
+                suggested_action="Dispatch perimeter patrol unit to Howrah Bridge approach. Execute ID verification for suspicious surveillance reconnaissance.",
                 status="ACTIVE_TRACKING"
             )
         ]

@@ -54,19 +54,19 @@ class MacroTrafficService:
         pairs = [
             ODPair(
                 origin_id="CAM_01",
-                origin_name="MG Road - Trinity Junction",
+                origin_name="Park Street - Chowringhee Crossing",
                 destination_id="CAM_03",
-                destination_name="Koramangala Financial Core",
+                destination_name="Maa Flyover - Park Circus Core",
                 trips_per_hour=340,
                 avg_transit_minutes=12.5,
-                dominant_vehicle_type="Sedans & Hatchbacks",
+                dominant_vehicle_type="Sedans & Cabs",
                 congestion_index=68.5
             ),
             ODPair(
                 origin_id="CAM_02",
-                origin_name="Indiranagar 100ft Express",
+                origin_name="EM Bypass - Science City Junction",
                 destination_id="CAM_05",
-                destination_name="Outer Ring Road Tech Hub",
+                destination_name="Salt Lake Sector V Tech Hub",
                 trips_per_hour=480,
                 avg_transit_minutes=18.2,
                 dominant_vehicle_type="Corporate Cabs & Tech Vans",
@@ -74,9 +74,9 @@ class MacroTrafficService:
             ),
             ODPair(
                 origin_id="CAM_04",
-                origin_name="West River Crossing Flyover",
+                origin_name="Howrah Bridge - Strand Road Crossing",
                 destination_id="CAM_01",
-                destination_name="MG Road Arterial",
+                destination_name="Park Street Arterial",
                 trips_per_hour=290,
                 avg_transit_minutes=9.8,
                 dominant_vehicle_type="Mixed Freight & Commuters",
@@ -84,9 +84,9 @@ class MacroTrafficService:
             ),
             ODPair(
                 origin_id="CAM_05",
-                origin_name="Bellandur Tech Hub",
+                origin_name="Salt Lake Sector V",
                 destination_id="CAM_06",
-                destination_name="Electronic City Tollway",
+                destination_name="New Town Biswa Bangla Gate",
                 trips_per_hour=415,
                 avg_transit_minutes=14.0,
                 dominant_vehicle_type="Buses & 2-Wheelers",
@@ -97,7 +97,7 @@ class MacroTrafficService:
             timestamp=datetime.utcnow().isoformat(),
             total_active_trips=sum(p.trips_per_hour for p in pairs),
             top_origin_destination_pairs=pairs,
-            dominant_commuter_corridor="Indiranagar -> Outer Ring Road Tech Hub (480 trips/hr)"
+            dominant_commuter_corridor="EM Bypass -> Salt Lake Sector V Tech Hub (480 trips/hr)"
         )
 
     @staticmethod
