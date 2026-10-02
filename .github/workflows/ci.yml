@@ -2,9 +2,9 @@ name: UrbanTwin AI CI
 
 on:
   push:
-    branches: [ "main", "master", "develop" ]
+    branches: [ "main", "master", "develop", "frontend", "backend", "Frontend" ]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "frontend", "backend", "Frontend" ]
 
 jobs:
   test:
