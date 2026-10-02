@@ -218,6 +218,27 @@ def test_anpr_ocr_image_upload():
     assert res_empty.status_code == 400
 
 
+def test_anpr_ocr_bharat_series_upload():
+    from training.dataset_generator import render_license_plate
+    import io
+
+    # Test multipart upload with real rendered Bharat Series license plate image (22 BH 6517 A)
+    img = render_license_plate("22BH6517A", degradation="clean")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    img_bytes = buf.getvalue()
+
+    files = {"file": ("bharat_series_test.jpg", img_bytes, "image/jpeg")}
+    res = client.post("/api/v1/cameras/ocr_upload", files=files)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["recognized_plate"] == "22BH6517A"
+    assert data["recognition_confidence"] >= 0.90
+    assert data["ocr_test_result"]["passes_90_pct_threshold"] is True
+    assert len(data["ocr_test_result"]["character_breakdown"]) == 9
+
+
+
 def test_single_plate_trajectory_reconstruction():
     res = client.get("/api/v1/vehicles/7XYZ912/trajectory")
     assert res.status_code == 200

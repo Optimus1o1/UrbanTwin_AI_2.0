@@ -53,10 +53,11 @@ NON_PLATE_WORDS = {
 
 # Regex patterns for embedded license plate extraction from surrounding vehicle text
 EXTRACTION_PATTERNS = [
+    # Bharat Series: e.g. 22BH6517A, 21BH2345AA, 22BH1234A
+    (re.compile(r'([0-9]{2}BH[0-9]{4}[A-Z]{1,2})'), 3.8),
+    (re.compile(r'([0-9]{2}BH[0-9]{1,4}[A-Z]{1,2})'), 3.4),
     # Indian standard: e.g. KA01MJ5021, DL08CA1990, MH12DE1433, HR26DQ5551
-    (re.compile(r'([A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{3,4})'), 3.2),
-    # Bharat Series: e.g. 22BH1234AA
-    (re.compile(r'([0-9]{2}BH[0-9]{4}[A-Z]{1,2})'), 3.2),
+    (re.compile(r'([A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{3,4})'), 3.6),
     # Common format without series: e.g. KA015021, DL4C1234
     (re.compile(r'([A-Z]{2}[0-9]{1,2}[A-Z]{0,2}[0-9]{1,4})'), 2.6),
     # International / Custom alphanumeric: e.g. 7XYZ912, 3ABC456
@@ -70,8 +71,9 @@ EXTRACTION_PATTERNS = [
 
 # Strict pattern validators for final candidate scoring
 PATTERNS = [
-    (re.compile(r'^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{3,4}$'), 3.2),
-    (re.compile(r'^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$'), 3.2),
+    (re.compile(r'^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$'), 3.8),
+    (re.compile(r'^[0-9]{2}BH[0-9]{1,4}[A-Z]{1,2}$'), 3.4),
+    (re.compile(r'^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{3,4}$'), 3.6),
     (re.compile(r'^[A-Z]{2}[0-9]{1,2}[A-Z]{0,2}[0-9]{1,4}$'), 2.6),
     (re.compile(r'^[0-9][A-Z]{3}[0-9]{3}$'), 2.4),
     (re.compile(r'^[A-Z]{3}[0-9]{3,4}$'), 2.2),
@@ -121,18 +123,49 @@ def _clean_text(text: str) -> str:
 def _disambiguate_plate_text(candidate: str) -> str:
     """
     Performs context-aware ANPR character disambiguation:
-    - In Indian state code (first 2 chars): digits are converted to letters.
-    - In RTO registration number (chars at index 2 and 3): letters are converted to digits.
+    - Bharat Series (YY BH NNNN XX): year and numbers enforced as digits, BH as letters, suffix as letters.
+    - Indian state code (first 2 chars): digits are converted to letters.
+    - In RTO district number (chars at index 2 and 3): letters are converted to digits.
     - In middle series (index 4..N-4): digits converted to letters.
     - In final registration digits (last 4 characters): letters converted to digits.
-    - In Bharat Series (YY BH NNNN XX): year and numbers enforced as digits.
     """
     if not candidate or len(candidate) < 5:
         return candidate
 
     chars = list(candidate)
 
-    # 1. State Code disambiguation (first 2 chars must be letters)
+    # 1. Bharat Series disambiguation: YY BH NNNN XX
+    # Check if chars contains 'BH' or OCR misread ('8H', 'SH', 'B#', '8#') at index 1..3
+    bh_idx = -1
+    for idx in range(1, min(4, len(chars) - 3)):
+        pair = ''.join(chars[idx:idx + 2])
+        if pair in ('BH', '8H', 'SH', 'B#', '8#', '84'):
+            bh_idx = idx
+            break
+
+    if bh_idx >= 1:
+        # Years before BH must be digits (e.g. 21, 22, 23)
+        for i in range(0, bh_idx):
+            if chars[i] in ALPHA_TO_DIGIT:
+                chars[i] = ALPHA_TO_DIGIT[chars[i]]
+        # BH characters must be 'B', 'H'
+        chars[bh_idx] = 'B'
+        chars[bh_idx + 1] = 'H'
+        # After BH: 4 digits (or up to last 1-2 letters)
+        num_start = bh_idx + 2
+        letter_count = 1
+        if len(chars) >= num_start + 5 and (chars[-2].isalpha() or chars[-2] in ('A', 'B', 'C', 'D')):
+            letter_count = 2
+        num_end = len(chars) - letter_count
+        for i in range(num_start, num_end):
+            if chars[i] in ALPHA_TO_DIGIT:
+                chars[i] = ALPHA_TO_DIGIT[chars[i]]
+        for i in range(num_end, len(chars)):
+            if chars[i] in DIGIT_TO_ALPHA:
+                chars[i] = DIGIT_TO_ALPHA[chars[i]]
+        return ''.join(chars)
+
+    # 2. Standard State Code disambiguation (first 2 chars must be letters)
     if chars[0] in DIGIT_TO_ALPHA:
         chars[0] = DIGIT_TO_ALPHA[chars[0]]
     if chars[1] in DIGIT_TO_ALPHA:
@@ -162,16 +195,6 @@ def _disambiguate_plate_text(candidate: str) -> str:
                     chars[idx] = '0'
                 elif chars[idx] in ALPHA_TO_DIGIT:
                     chars[idx] = ALPHA_TO_DIGIT[chars[idx]]
-
-    # 2. Bharat Series disambiguation: YY BH NNNN XX
-    if len(chars) >= 9 and ''.join(chars[2:4]) in ('BH', '8H', 'B#', '8#', 'SH'):
-        chars[2], chars[3] = 'B', 'H'
-        for i in (0, 1, 4, 5, 6, 7):
-            if chars[i] in ALPHA_TO_DIGIT:
-                chars[i] = ALPHA_TO_DIGIT[chars[i]]
-        for i in range(8, len(chars)):
-            if chars[i] in DIGIT_TO_ALPHA:
-                chars[i] = DIGIT_TO_ALPHA[chars[i]]
 
     return ''.join(chars)
 
@@ -255,20 +278,31 @@ def _score_candidate(candidate: str, raw_conf: float) -> float:
     if has_alpha and has_digit:
         score *= 1.5
     else:
-        score *= 0.4  # Heavily penalize purely alphabetic or purely numeric strings
+        score *= 0.35  # Heavily penalize purely alphabetic or purely numeric strings
 
-    # Extra bonus if it starts with a recognized Indian state code
-    if len(candidate) >= 4 and candidate[:2].isalpha():
+    # Check if Bharat Series plate: e.g. 22BH6517A
+    is_bharat = bool(re.match(r'^[0-9]{2}BH[0-9]{1,4}[A-Z]{1,2}$', candidate))
+    if is_bharat:
+        score *= 2.6  # High national recognition bonus
+    elif candidate.startswith('BH') and not (candidate[:2].isdigit()):
+        # Fragment like BH651 without year prefix: penalize
+        score *= 0.4
+    elif len(candidate) >= 4 and candidate[:2].isalpha():
+        # Standard Indian state code check
         if candidate[:2] in INDIAN_STATES:
-            score *= 2.2
+            score *= 2.4
         else:
-            score *= 0.6  # Penalize non-existent state prefixes (e.g. UZ, QQ)
+            score *= 0.5  # Penalize non-existent state prefixes (e.g. UZ, QQ)
 
-    # Optimal plate length: 7 to 10 chars
-    if 7 <= len(candidate) <= 10:
-        score *= 1.35
-    elif 4 <= len(candidate) <= 6:
-        score *= 1.05
+    # Length bonuses: Full complete plate (8-11 chars) vs short fragments
+    if 8 <= len(candidate) <= 10:
+        score *= 1.6
+    elif len(candidate) == 7 or len(candidate) == 11:
+        score *= 1.3
+    elif len(candidate) == 6:
+        score *= 0.7
+    elif len(candidate) <= 5:
+        score *= 0.35  # Heavily penalize 4-5 char fragments (like BH651)
 
     return score
 
@@ -298,36 +332,37 @@ def localize_plate_candidates(img_rgb: np.ndarray) -> List[Tuple[np.ndarray, Tup
     total_area = h * w
     candidates: List[Tuple[np.ndarray, Tuple[int, int, int, int], str]] = []
 
-    # Fast Path: If image is already a dedicated license plate crop (aspect ratio 2.2 - 6.0 and h <= 180),
-    # prioritize the full image first so inference resolves in a single pass (<1.5s).
+    # Fast Path: If image is plate-shaped (aspect ratio 1.4 - 7.5),
+    # ALWAYS evaluate the full image first so pre-cropped user uploads resolve with full context.
     aspect_ratio = w / float(max(1, h))
-    is_pre_cropped = (2.2 <= aspect_ratio <= 6.0) and h <= 180
+    is_pre_cropped = (1.4 <= aspect_ratio <= 7.5)
     if is_pre_cropped:
         candidates.append((img_rgb, (0, 0, w, h), 'full_image'))
 
     gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
 
-    # 1. Edge & Contour Morphology (Sobel-X)
+    # 1. Edge & Contour Morphology (Sobel-X) with wide horizontal kernel to bridge character gaps
     try:
         clahe = cv2.createCLAHE(clipLimit=2.2, tileGridSize=(8, 8))
         enhanced = clahe.apply(gray)
         sobelx = cv2.Sobel(enhanced, cv2.CV_8U, 1, 0, ksize=3)
         _, thresh = cv2.threshold(sobelx, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        # Horizontal closing to fuse individual character strokes into a plate rectangle
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (21, 5))
-        closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+        # Multi-scale horizontal closing:
+        # Widen kernel to 45x7 to bridge wide spaces between year, series, and digits on Indian plates
+        kernel_wide = cv2.getStructuringElement(cv2.MORPH_RECT, (45, 7))
+        closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel_wide)
 
         contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for c in contours:
             x, y, cw, ch = cv2.boundingRect(c)
             aspect = cw / float(max(1, ch))
             area = cw * ch
-            # Standard 1-line plate: aspect 1.8-6.5, 2-line plate: 1.1-2.2
-            if (1.8 <= aspect <= 6.5 or 1.1 <= aspect <= 2.2) and cw >= 35 and ch >= 10:
-                if 0.0004 * total_area <= area <= 0.35 * total_area:
+            # Standard 1-line plate: aspect 1.5-7.5, 2-line plate: 1.1-2.2
+            if (1.5 <= aspect <= 7.5 or 1.1 <= aspect <= 2.2) and cw >= 35 and ch >= 10:
+                if 0.0004 * total_area <= area <= 0.45 * total_area:
                     mx = int(cw * 0.15)
-                    my = int(ch * 0.20)
+                    my = int(ch * 0.22)
                     x1 = max(0, x - mx)
                     y1 = max(0, y - my)
                     x2 = min(w, x + cw + mx)
@@ -341,23 +376,21 @@ def localize_plate_candidates(img_rgb: np.ndarray) -> List[Tuple[np.ndarray, Tup
     # 2. High-Contrast Luminance / Color Segmentation (White & Yellow plates)
     try:
         hsv = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2HSV)
-        # White plate mask: low saturation, high value
-        white_mask = cv2.inRange(hsv, np.array([0, 0, 150]), np.array([180, 50, 255]))
-        # Yellow plate mask (commercial/taxis): hue in 15-38, high sat & val
-        yellow_mask = cv2.inRange(hsv, np.array([15, 60, 120]), np.array([38, 255, 255]))
+        white_mask = cv2.inRange(hsv, np.array([0, 0, 140]), np.array([180, 55, 255]))
+        yellow_mask = cv2.inRange(hsv, np.array([15, 55, 110]), np.array([38, 255, 255]))
         color_mask = cv2.bitwise_or(white_mask, yellow_mask)
 
-        kernel_c = cv2.getStructuringElement(cv2.MORPH_RECT, (17, 5))
+        kernel_c = cv2.getStructuringElement(cv2.MORPH_RECT, (35, 7))
         closed_color = cv2.morphologyEx(color_mask, cv2.MORPH_CLOSE, kernel_c)
         contours_c, _ = cv2.findContours(closed_color, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for c in contours_c:
             x, y, cw, ch = cv2.boundingRect(c)
             aspect = cw / float(max(1, ch))
             area = cw * ch
-            if (2.0 <= aspect <= 6.0) and cw >= 45 and ch >= 12:
-                if 0.0005 * total_area <= area <= 0.25 * total_area:
+            if (1.8 <= aspect <= 7.0) and cw >= 40 and ch >= 12:
+                if 0.0005 * total_area <= area <= 0.40 * total_area:
                     mx = int(cw * 0.12)
-                    my = int(ch * 0.15)
+                    my = int(ch * 0.18)
                     x1 = max(0, x - mx)
                     y1 = max(0, y - my)
                     x2 = min(w, x + cw + mx)
@@ -369,21 +402,21 @@ def localize_plate_candidates(img_rgb: np.ndarray) -> List[Tuple[np.ndarray, Tup
         print(f"[OCRImageService] Color localization note: {e}")
 
     # 3. Vehicle Geometric Prior Windows (Plates are almost always in lower 65% of vehicle)
-    if h >= 250 and w >= 250:
+    if h >= 220 and w >= 220:
         # Lower-center bumper region (typically front or rear plate)
-        y1_lc = int(0.35 * h)
+        y1_lc = int(0.30 * h)
         y2_lc = int(0.95 * h)
-        x1_lc = int(0.12 * w)
-        x2_lc = int(0.88 * w)
+        x1_lc = int(0.08 * w)
+        x2_lc = int(0.92 * w)
         lc_crop = img_rgb[y1_lc:y2_lc, x1_lc:x2_lc]
         if lc_crop.size > 0:
             candidates.append((lc_crop, (x1_lc, y1_lc, x2_lc - x1_lc, y2_lc - y1_lc), 'geometric_lower_center'))
 
         # Bottom bumper crop
-        y1_bb = int(0.50 * h)
+        y1_bb = int(0.45 * h)
         y2_bb = int(1.0 * h)
-        x1_bb = int(0.08 * w)
-        x2_bb = int(0.92 * w)
+        x1_bb = int(0.05 * w)
+        x2_bb = int(0.95 * w)
         bb_crop = img_rgb[y1_bb:y2_bb, x1_bb:x2_bb]
         if bb_crop.size > 0:
             candidates.append((bb_crop, (x1_bb, y1_bb, x2_bb - x1_bb, y2_bb - y1_bb), 'geometric_bottom_bumper'))
@@ -441,6 +474,92 @@ def _enhance_crop_variants(crop_rgb: np.ndarray) -> List[np.ndarray]:
     return variants
 
 
+def _assemble_spatial_text_lines(ocr_results: List[Any], min_conf: float = 0.20) -> List[Tuple[str, float]]:
+    """
+    Spatially groups EasyOCR text bounding boxes that share the same horizontal baseline
+    and concatenates them left-to-right to reconstruct complete multi-token plates.
+    Filters out decorative badges like 'IND' and noise.
+    Returns: List of (assembled_text, avg_confidence).
+    """
+    if not ocr_results:
+        return []
+
+    boxes = []
+    for r in ocr_results:
+        pts = r[0]
+        raw_txt = str(r[1]).strip()
+        conf = float(r[2])
+        if not raw_txt or conf < min_conf:
+            continue
+
+        clean = _clean_text(raw_txt)
+        # Skip decorative 'IND' or watermarks
+        if clean in NON_PLATE_WORDS or clean in ('IND', 'INDIA'):
+            continue
+
+        xs = [pt[0] for pt in pts]
+        ys = [pt[1] for pt in pts]
+        x1, x2 = float(min(xs)), float(max(xs))
+        y1, y2 = float(min(ys)), float(max(ys))
+        yc = (y1 + y2) / 2.0
+        h = max(1.0, y2 - y1)
+
+        boxes.append({
+            'text': raw_txt,
+            'clean': clean,
+            'conf': conf,
+            'x1': x1,
+            'x2': x2,
+            'yc': yc,
+            'h': h
+        })
+
+    if not boxes:
+        return []
+
+    # Sort boxes top-to-bottom
+    boxes.sort(key=lambda b: b['yc'])
+
+    # Cluster boxes into horizontal lines
+    lines: List[List[Dict[str, Any]]] = []
+    for b in boxes:
+        matched_line = None
+        for line in lines:
+            line_yc = sum(item['yc'] for item in line) / len(line)
+            line_h = sum(item['h'] for item in line) / len(line)
+            if abs(b['yc'] - line_yc) <= line_h * 0.65:
+                matched_line = line
+                break
+        if matched_line is not None:
+            matched_line.append(b)
+        else:
+            lines.append([b])
+
+    assembled_candidates: List[Tuple[str, float]] = []
+
+    # 1. Process each line sorted left to right
+    for line in lines:
+        line.sort(key=lambda b: b['x1'])
+        combined_text = ''.join(b['clean'] for b in line)
+        if len(combined_text) >= 4:
+            avg_conf = sum(b['conf'] for b in line) / len(line)
+            assembled_candidates.append((combined_text, avg_conf))
+
+    # 2. Process multi-line plates (e.g. 2-line two-wheeler / commercial plates)
+    if len(lines) == 2:
+        top_line = sorted(lines[0], key=lambda b: b['x1'])
+        bot_line = sorted(lines[1], key=lambda b: b['x1'])
+        top_txt = ''.join(b['clean'] for b in top_line)
+        bot_txt = ''.join(b['clean'] for b in bot_line)
+        multi_text = top_txt + bot_txt
+        if len(multi_text) >= 6:
+            all_boxes = top_line + bot_line
+            avg_conf = sum(b['conf'] for b in all_boxes) / len(all_boxes)
+            assembled_candidates.append((multi_text, avg_conf))
+
+    return assembled_candidates
+
+
 def recognize_plate_from_image(image_bytes: bytes) -> Tuple[str, float, str, List[str], Optional[Image.Image]]:
     """
     Performs multi-stage Computer Vision ANPR OCR on vehicle or license plate image bytes:
@@ -487,7 +606,22 @@ def recognize_plate_from_image(image_bytes: bytes) -> Tuple[str, float, str, Lis
                         if raw_txt and raw_txt not in all_detected_texts:
                             all_detected_texts.append(raw_txt)
 
-                    # Evaluate each detected text box individually
+                    # 1. Spatial text line assembly (groups horizontally aligned plate components)
+                    spatial_lines = _assemble_spatial_text_lines(ocr_results)
+                    for line_txt, line_conf in spatial_lines:
+                        for token, boost in _extract_plate_tokens(line_txt):
+                            score = _score_candidate(token, line_conf * boost)
+                            if score > 0.0:
+                                scored_candidates.append({
+                                    'plate': token,
+                                    'conf': line_conf,
+                                    'score': score,
+                                    'engine': f"Plate Localizer ({method}) + Spatial Line Assembly",
+                                    'crop': crop_rgb,
+                                    'bbox': bbox
+                                })
+
+                    # 2. Evaluate each detected text box individually
                     for bbox_res, raw_txt, raw_conf in ocr_results:
                         conf_val = float(raw_conf)
                         extracted_tokens = _extract_plate_tokens(raw_txt)
@@ -503,16 +637,14 @@ def recognize_plate_from_image(image_bytes: bytes) -> Tuple[str, float, str, Lis
                                     'bbox': bbox
                                 })
 
-                    # Also evaluate concatenated text boxes (multi-line or spaced plates)
-                    # ONLY for localized crops (NEVER concatenate all boxes across an entire full vehicle image)
-                    if len(ocr_results) > 1 and method != 'full_image':
-                        # Filter out non-plate boxes like 'IND', brand names, pure long numbers, or watermarks before fusing
+                    # 3. Concatenate non-noise text boxes sorted top-to-bottom, left-to-right
+                    if len(ocr_results) > 1:
                         candidate_boxes = [
                             b for b in ocr_results
                             if _clean_text(str(b[1])) not in NON_PLATE_WORDS
                             and not any(kw in _clean_text(str(b[1])) for kw in ['SHUTTERSTOCK', 'ISTOCK', 'GETTY', 'IND'])
                             and not (_clean_text(str(b[1])).isdigit() and len(_clean_text(str(b[1]))) > 4)
-                            and len(_clean_text(str(b[1]))) <= 10
+                            and len(_clean_text(str(b[1]))) <= 12
                         ]
                         if len(candidate_boxes) > 1:
                             sorted_boxes = sorted(
@@ -534,15 +666,15 @@ def recognize_plate_from_image(image_bytes: bytes) -> Tuple[str, float, str, Lis
                                         'bbox': bbox
                                     })
 
-                    # If we found a high-confidence match conforming to standard plate regex with valid state code, break early
-                    top_matches = [c for c in scored_candidates if c['score'] >= 3.0]
+                    # Break early ONLY if we found an exceptional complete plate match (score >= 6.0 and length >= 8)
+                    top_matches = [c for c in scored_candidates if c['score'] >= 6.0 and len(c['plate']) >= 8]
                     if top_matches:
                         break
 
                 except Exception as ocr_err:
                     print(f"[OCRImageService] Candidate {cand_idx} pass {var_idx} note: {ocr_err}")
 
-            if any(c['score'] >= 3.0 for c in scored_candidates):
+            if any(c['score'] >= 6.0 and len(c['plate']) >= 8 for c in scored_candidates):
                 break
 
         # Select best candidate
