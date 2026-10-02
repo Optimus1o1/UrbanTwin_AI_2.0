@@ -2794,6 +2794,21 @@ window.loadStreamStatuses = async function () {
     const totalPlatesEl = document.getElementById('telemetry-total-plates');
     if (totalPlatesEl) totalPlatesEl.textContent = `${totalPlates} Plates`;
 
+    // Update Live Stream Telemetry KPI Strip
+    const liveActiveCount = document.getElementById('telemetry-live-active-count');
+    const liveAvgSpeed = document.getElementById('telemetry-live-avg-speed');
+    const liveAvgConf = document.getElementById('telemetry-live-avg-conf');
+    const liveLatestPlate = document.getElementById('telemetry-live-latest-plate');
+
+    if (detectionsAll.length > 0) {
+      if (liveActiveCount) liveActiveCount.textContent = `${detectionsAll.length} Targets`;
+      const avgSpeed = (detectionsAll.reduce((acc, d) => acc + (d.speed_kmh || 45), 0) / detectionsAll.length).toFixed(1);
+      if (liveAvgSpeed) liveAvgSpeed.textContent = `${avgSpeed} km/h`;
+      const avgConf = Math.round((detectionsAll.reduce((acc, d) => acc + (d.confidence || 0.95), 0) / detectionsAll.length) * 100);
+      if (liveAvgConf) liveAvgConf.textContent = `${avgConf}%`;
+      if (liveLatestPlate) liveLatestPlate.textContent = detectionsAll[0].plate_text;
+    }
+
     renderStreamDetectionsTable(detectionsAll);
   } catch (err) {
     console.warn("Error updating stream telemetry:", err);
@@ -2806,7 +2821,7 @@ function renderStreamDetectionsTable(detections) {
 
   if (!detections || detections.length === 0) {
     if (!tbody.hasChildNodes()) {
-      tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-gray-500 font-mono">Awaiting live vehicle frame detections...</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" class="py-4 text-center text-gray-500 font-mono">Awaiting live vehicle frame detections...</td></tr>`;
     }
     return;
   }
@@ -2814,30 +2829,46 @@ function renderStreamDetectionsTable(detections) {
   const now = new Date();
   const timeStr = now.toTimeString().split(' ')[0];
 
-  const rowsHtml = detections.slice(0, 8).map(d => `
+  const rowsHtml = detections.slice(0, 10).map(d => {
+    const speedVal = d.speed_kmh || 45;
+    const speedColor = speedVal > 60 ? 'text-rose-400 font-bold' : (speedVal > 45 ? 'text-amber-400 font-semibold' : 'text-emerald-400 font-semibold');
+    const colorHex = d.color_hex || '#cbd5e1';
+    const colorName = d.vehicle_color || 'Silver Metallic';
+    const laneStr = d.lane || 'Lane 2 (Express Center)';
+
+    return `
     <tr class="hover:bg-cyan-950/20 transition">
       <td class="py-2.5 px-3 font-bold text-cyan-400 flex items-center space-x-1.5">
         <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
         <span>${d.camera_id}</span>
       </td>
-      <td class="py-2.5 px-3 text-gray-400">${timeStr}</td>
+      <td class="py-2.5 px-3 text-gray-400">${d.timestamp || timeStr}</td>
       <td class="py-2.5 px-3 font-bold text-white tracking-wider">
-        <span class="bg-slate-900 px-2 py-0.5 rounded border border-cyan-500/40 text-cyan-300 font-mono">${d.plate_text}</span>
+        <span class="bg-slate-900 px-2 py-0.5 rounded border border-cyan-500/40 text-cyan-300 font-mono font-bold">${d.plate_text}</span>
       </td>
-      <td class="py-2.5 px-3 text-slate-300">${d.vehicle_type || 'Vehicle'}</td>
-      <td class="py-2.5 px-3 text-amber-400 font-mono">${(d.speed_kmh || 45).toFixed(1)} km/h</td>
+      <td class="py-2.5 px-3 text-slate-300 font-sans font-semibold">${d.vehicle_type || 'Vehicle'}</td>
+      <td class="py-2.5 px-3">
+        <div class="flex items-center space-x-1.5">
+          <span class="w-2.5 h-2.5 rounded-full border border-slate-700 shadow-sm shrink-0" style="background-color: ${colorHex}"></span>
+          <span class="text-slate-300 text-[11px] truncate max-w-[120px]">${colorName}</span>
+        </div>
+      </td>
+      <td class="py-2.5 px-3 font-mono ${speedColor}">${speedVal.toFixed(1)} km/h</td>
+      <td class="py-2.5 px-3">
+        <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-cyan-300 text-[10px] whitespace-nowrap">${laneStr}</span>
+      </td>
       <td class="py-2.5 px-3">
         <span class="px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold font-mono">
           ${Math.round((d.confidence || 0.94) * 100)}% Match
         </span>
       </td>
       <td class="py-2.5 px-3 text-right">
-        <button onclick="window.switchTab('tracking'); if(window.queryPlate) window.queryPlate('${d.plate_text}');" class="px-2.5 py-1 bg-cyan-600/30 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 rounded transition text-[10px] font-bold">
-          Locate Route
+        <button onclick="window.switchTab('tracking'); if(window.queryPlate) window.queryPlate('${d.plate_text}');" class="px-2.5 py-1 bg-cyan-600/30 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 rounded transition text-[10px] font-bold whitespace-nowrap">
+          <i class="fa-solid fa-crosshairs mr-1"></i>Locate Route
         </button>
       </td>
     </tr>
-  `).join('');
+  `}).join('');
 
   tbody.innerHTML = rowsHtml;
 }

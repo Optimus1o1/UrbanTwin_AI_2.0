@@ -116,3 +116,68 @@ def test_mjpeg_stream_generator_frame_structure():
     assert b"--frame\r\n" in first_chunk
     assert b"Content-Type: image/jpeg\r\n\r\n" in first_chunk
     assert len(first_chunk) > 1000
+
+
+def test_live_vehicle_recognition_engine_parameters():
+    """
+    Validates that LiveVehicleRecognitionEngine successfully extracts all 7 parameters:
+    1. Vehicle Bounding Box
+    2. Vehicle Classification
+    3. Dominant Color & Hex
+    4. Optical Speed Estimate (km/h)
+    5. Lane Assignment
+    6. ANPR License Plate & Confidence
+    7. Cyber HUD Telemetry
+    """
+    from app.services.video_ingestion_service import LiveVehicleRecognitionEngine
+    import cv2
+
+    engine = LiveVehicleRecognitionEngine(camera_id="CAM_TEST")
+
+    # 1. Color extraction test on yellow taxi crop
+    yellow_crop = np.zeros((100, 100, 3), dtype=np.uint8)
+    yellow_crop[:] = (30, 210, 240) # BGR Yellow
+    c_name, c_hex = engine.extract_dominant_color(yellow_crop)
+    assert "Yellow" in c_name
+    assert c_hex == "#eab308"
+
+    # 2. Vehicle classification test
+    assert engine.classify_vehicle(300, 150, "Silver Metallic") == "Transit Bus (CSTC)"
+    assert engine.classify_vehicle(180, 100, "Classic Yellow (Kolkata Taxi)") == "Commercial Taxi (Ambassador)"
+    assert engine.classify_vehicle(40, 50, "Obsidian Black") == "Motorcycle / Two-Wheeler"
+
+    # 3. Lane determination test
+    assert "Lane 1" in engine.determine_lane(200, 960)
+    assert "Lane 2" in engine.determine_lane(480, 960)
+    assert "Lane 3" in engine.determine_lane(800, 960)
+
+    # 4. End-to-end frame processing test
+    test_frame = np.zeros((540, 960, 3), dtype=np.uint8)
+    # Draw a simulated vehicle shape
+    cv2.rectangle(test_frame, (400, 200), (560, 300), (20, 200, 240), -1)
+
+    ann_frame, detections = engine.process_frame(
+        frame=test_frame,
+        camera_id="CAM_01",
+        camera_name="Park Street",
+        mode="phone_live",
+        fps=30.0,
+        status="STREAMING"
+    )
+
+    assert isinstance(ann_frame, np.ndarray)
+    assert ann_frame.shape == (540, 960, 3)
+    assert len(detections) > 0
+
+    det = detections[0]
+    required_keys = [
+        "track_id", "vehicle_type", "vehicle_color", "color_hex",
+        "lane", "plate_text", "confidence", "speed_kmh", "bbox", "timestamp"
+    ]
+    for key in required_keys:
+        assert key in det, f"Missing required telemetry parameter: {key}"
+
+    assert len(det["bbox"]) == 4
+    assert det["confidence"] >= 0.90
+    assert det["speed_kmh"] > 0
+

@@ -161,13 +161,28 @@ class SyntheticTrafficGenerator:
             cv2.rectangle(frame, (x1, max(0, y1 - th - 10)), (x1 + tw + 10, y1), box_color, 1)
             cv2.putText(frame, label_text, (x1 + 5, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (240, 240, 240), 1, cv2.LINE_AA)
 
+            color_info = [
+                ("Silver Metallic", "#cbd5e1"),
+                ("Obsidian Black", "#1e293b"),
+                ("Pearl White", "#f8fafc"),
+                ("Crimson Red", "#ef4444"),
+                ("Navy Blue", "#2563eb"),
+                ("Classic Yellow (Kolkata Taxi)", "#eab308"),
+            ][i % 6]
+            lanes = ["Lane 1 (Westbound / Curb)", "Lane 2 (Express Center)", "Lane 3 (Eastbound / Overtake)"]
+            lane = lanes[i % 3]
+
             detections.append({
                 "track_id": track_id,
                 "vehicle_type": v_type,
+                "vehicle_color": color_info[0],
+                "color_hex": color_info[1],
+                "lane": lane,
                 "plate_text": plate,
                 "confidence": conf,
                 "speed_kmh": speed,
-                "bbox": [x1, y1, x2, y2]
+                "bbox": [x1, y1, x2, y2],
+                "timestamp": time.strftime("%H:%M:%S")
             })
 
         # 5. Top Left Camera HUD Telemetry Lockup

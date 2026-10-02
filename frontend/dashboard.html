@@ -1678,9 +1678,41 @@
         <div class="flex flex-wrap items-center justify-between pb-3 border-b border-slate-800 gap-2">
           <div class="flex items-center space-x-2">
             <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
-            <h4 class="font-bold text-white text-sm brand-font">Real-Time Ingestion ANPR Log &amp; Trajectory Link</h4>
+            <h4 class="font-bold text-white text-sm brand-font">Real-Time Ingestion ANPR Log &amp; Multi-Parameter Recognition</h4>
           </div>
           <span class="text-xs text-gray-400 font-mono">Syncing with Central Kolkata Traffic Digital Twin</span>
+        </div>
+
+        <!-- Live Stream Telemetry KPI Strip -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+          <div class="bg-slate-900/90 border border-cyan-500/20 rounded-xl p-3">
+            <div class="text-[10px] font-mono text-gray-400 flex items-center justify-between">
+              <span>ACTIVE DETECTIONS</span>
+              <i class="fa-solid fa-car text-cyan-400"></i>
+            </div>
+            <div class="text-lg font-bold font-mono text-cyan-300 mt-1" id="telemetry-live-active-count">0 Targets</div>
+          </div>
+          <div class="bg-slate-900/90 border border-amber-500/20 rounded-xl p-3">
+            <div class="text-[10px] font-mono text-gray-400 flex items-center justify-between">
+              <span>FLOW SPEED</span>
+              <i class="fa-solid fa-gauge-high text-amber-400"></i>
+            </div>
+            <div class="text-lg font-bold font-mono text-amber-300 mt-1" id="telemetry-live-avg-speed">48.2 km/h</div>
+          </div>
+          <div class="bg-slate-900/90 border border-emerald-500/20 rounded-xl p-3">
+            <div class="text-[10px] font-mono text-gray-400 flex items-center justify-between">
+              <span>ANPR MATCH ACCURACY</span>
+              <i class="fa-solid fa-bullseye text-emerald-400"></i>
+            </div>
+            <div class="text-lg font-bold font-mono text-emerald-300 mt-1" id="telemetry-live-avg-conf">96.4%</div>
+          </div>
+          <div class="bg-slate-900/90 border border-purple-500/20 rounded-xl p-3">
+            <div class="text-[10px] font-mono text-gray-400 flex items-center justify-between">
+              <span>LATEST RECOGNIZED</span>
+              <i class="fa-solid fa-id-card text-purple-400"></i>
+            </div>
+            <div class="text-sm font-bold font-mono text-purple-300 mt-1 truncate" id="telemetry-live-latest-plate">WB02AK4921</div>
+          </div>
         </div>
 
         <div class="overflow-x-auto">
@@ -1691,7 +1723,9 @@
                 <th class="py-2.5 px-3">Timestamp</th>
                 <th class="py-2.5 px-3">License Plate</th>
                 <th class="py-2.5 px-3">Vehicle Class</th>
+                <th class="py-2.5 px-3">Body Color</th>
                 <th class="py-2.5 px-3">Speed Estimate</th>
+                <th class="py-2.5 px-3">Lane Assignment</th>
                 <th class="py-2.5 px-3">OCR Confidence</th>
                 <th class="py-2.5 px-3 text-right">Digital Twin Action</th>
               </tr>
