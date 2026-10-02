@@ -179,5 +179,58 @@ def test_live_vehicle_recognition_engine_parameters():
 
     assert len(det["bbox"]) == 4
     assert det["confidence"] >= 0.90
-    assert det["speed_kmh"] > 0
+    assert det["speed_kmh"] >= 0.0
+
+
+def test_optical_speed_stationary_and_motion():
+    """
+    Validates that:
+    1. Stationary vehicle correctly yields 0.0 km/h (no false positive motion).
+    2. Moving vehicle yields real speed > 0.0 km/h proportional to optical flow displacement.
+    """
+    from app.services.video_ingestion_service import LiveVehicleRecognitionEngine
+    import cv2
+    import time
+
+    engine = LiveVehicleRecognitionEngine(camera_id="CAM_SPEED_TEST")
+
+    # Stationary frame test (identical consecutive frames)
+    f_stat1 = np.zeros((540, 960, 3), dtype=np.uint8)
+    cv2.rectangle(f_stat1, (350, 150), (600, 320), (50, 50, 50), -1)
+
+    f_stat2 = f_stat1.copy()
+
+    _, d1 = engine.process_frame(f_stat1, "CAM_01", "Node A", "phone_live", 30.0, "STREAMING")
+    time.sleep(0.04)
+    _, d2 = engine.process_frame(f_stat2, "CAM_01", "Node A", "phone_live", 30.0, "STREAMING")
+
+    assert len(d2) > 0
+    assert d2[0]["speed_kmh"] == 0.0  # Must be strictly 0.0 km/h when stationary
+
+    # Moving vehicle test (position shifted across frame)
+    f_move = np.zeros((540, 960, 3), dtype=np.uint8)
+    cv2.rectangle(f_move, (400, 150), (650, 320), (50, 50, 50), -1)
+
+    time.sleep(0.04)
+    _, d3 = engine.process_frame(f_move, "CAM_01", "Node A", "phone_live", 30.0, "STREAMING")
+    assert len(d3) > 0
+    assert d3[0]["speed_kmh"] > 0.0  # Dynamic motion detected
+
+
+def test_real_anpr_ocr_recognition_on_frame():
+    """
+    Validates that EasyOCR recognizer reads real license plate characters
+    from an image array and updates the detection payload.
+    """
+    from app.services.ocr_image_service import recognize_plate_from_array
+    import cv2
+
+    # Synthesize clean high-contrast Indian plate
+    plate_img = np.ones((70, 240, 3), dtype=np.uint8) * 255
+    cv2.putText(plate_img, "WB02AK4921", (15, 45), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 0), 2)
+
+    plate_text, conf, engine_name, _, _ = recognize_plate_from_array(plate_img, is_bgr=True)
+    assert plate_text == "WB02AK4921"
+    assert conf >= 0.70
+    assert "EasyOCR" in engine_name or "Plate Localizer" in engine_name
 

@@ -21,6 +21,7 @@ Pipeline Architecture:
 
 import io
 import re
+import threading
 try:
     import cv2
 except ImportError:
@@ -29,9 +30,10 @@ import numpy as np
 from typing import Tuple, Optional, List, Dict, Any
 from PIL import Image
 
-# Lazy-loaded EasyOCR reader (singleton)
+# Lazy-loaded EasyOCR reader (singleton) with thread safety
 _OCR_READER = None
 _OCR_INIT_ATTEMPTED = False
+_OCR_LOCK = threading.Lock()
 
 # Indian States & Union Territories codes
 INDIAN_STATES = {
@@ -94,25 +96,28 @@ DIGIT_TO_ALPHA = {
 
 
 def _get_ocr_reader():
-    """Lazy-initialize EasyOCR reader."""
+    """Lazy-initialize EasyOCR reader with thread-safety."""
     global _OCR_READER, _OCR_INIT_ATTEMPTED
     if _OCR_READER is not None:
         return _OCR_READER
-    if _OCR_INIT_ATTEMPTED:
-        return None
-    _OCR_INIT_ATTEMPTED = True
-    try:
-        import easyocr
-        _OCR_READER = easyocr.Reader(
-            ['en'],
-            gpu=False,
-            verbose=False
-        )
-        print("[OCRImageService] EasyOCR reader initialized successfully")
-        return _OCR_READER
-    except Exception as e:
-        print(f"[OCRImageService] Warning: Failed to initialize EasyOCR: {e}")
-        return None
+    with _OCR_LOCK:
+        if _OCR_READER is not None:
+            return _OCR_READER
+        if _OCR_INIT_ATTEMPTED:
+            return None
+        try:
+            import easyocr
+            _OCR_READER = easyocr.Reader(
+                ['en'],
+                gpu=False,
+                verbose=False
+            )
+            print("[OCRImageService] EasyOCR reader initialized successfully")
+            return _OCR_READER
+        except Exception as e:
+            _OCR_INIT_ATTEMPTED = True
+            print(f"[OCRImageService] Warning: Failed to initialize EasyOCR: {e}")
+            return None
 
 
 def _clean_text(text: str) -> str:
@@ -562,7 +567,26 @@ def _assemble_spatial_text_lines(ocr_results: List[Any], min_conf: float = 0.20)
 
 def recognize_plate_from_image(image_bytes: bytes) -> Tuple[str, float, str, List[str], Optional[Image.Image]]:
     """
-    Performs multi-stage Computer Vision ANPR OCR on vehicle or license plate image bytes:
+    Performs multi-stage Computer Vision ANPR OCR on vehicle or license plate image bytes.
+    Decodes bytes and delegates to recognize_plate_from_array.
+    """
+    if cv2 is None:
+        return ("", 0.0, "OpenCV (unavailable)", [], None)
+    try:
+        pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        img_array = np.array(pil_image)
+        return recognize_plate_from_array(img_array, is_bgr=False)
+    except Exception as e:
+        print(f"[OCRImageService] Error decoding image bytes: {e}")
+        return ("", 0.0, f"Image decoding error: {str(e)[:50]}", [], None)
+
+
+def recognize_plate_from_array(
+    img_array: np.ndarray,
+    is_bgr: bool = True
+) -> Tuple[str, float, str, List[str], Optional[Image.Image]]:
+    """
+    Performs high-accuracy Computer Vision ANPR OCR directly on an in-memory numpy image array:
     1. Localizes candidate plate regions across the vehicle image (Sobel-X, Color Mask, Geometric Priors)
     2. Enhances and normalizes localized candidate crops
     3. Executes deep neural OCR across candidate regions
@@ -576,11 +600,13 @@ def recognize_plate_from_image(image_bytes: bytes) -> Tuple[str, float, str, Lis
         return ("", 0.0, "EasyOCR (unavailable)", [], None)
 
     try:
-        pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        img_array = np.array(pil_image)
+        if is_bgr:
+            img_rgb = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
+        else:
+            img_rgb = img_array
 
         # 1. Image Recognition: Localize plate candidates
-        candidates = localize_plate_candidates(img_array)
+        candidates = localize_plate_candidates(img_rgb)
 
         best_plate = ""
         best_conf = 0.0
@@ -694,3 +720,4 @@ def recognize_plate_from_image(image_bytes: bytes) -> Tuple[str, float, str, Lis
     except Exception as e:
         print(f"[OCRImageService] Error during ANPR OCR: {e}")
         return ("", 0.0, f"EasyOCR (error: {str(e)[:50]})", [], None)
+
