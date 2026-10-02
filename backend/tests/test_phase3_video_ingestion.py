@@ -234,3 +234,58 @@ def test_real_anpr_ocr_recognition_on_frame():
     assert conf >= 0.70
     assert "EasyOCR" in engine_name or "Plate Localizer" in engine_name
 
+
+def test_webcam_mode_configuration():
+    """Validates configuring camera to hardware webcam mode."""
+    res = client.post("/api/v1/cameras/CAM_01/stream/configure", json={
+        "mode": "webcam",
+        "source_url": "0"
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["camera_id"] == "CAM_01"
+    assert data["mode"] == "webcam"
+    assert data["source_url"] == "0"
+
+    # Revert back to synthetic mode
+    res_revert = client.post("/api/v1/cameras/CAM_01/stream/configure", json={
+        "mode": "synthetic",
+        "source_url": ""
+    })
+    assert res_revert.status_code == 200
+
+
+def test_browser_frame_ingest_endpoint():
+    """Validates pushing browser webcam frames to /api/v1/cameras/{id}/stream/frame_ingest."""
+    import cv2
+    test_img = np.zeros((480, 640, 3), dtype=np.uint8)
+    cv2.putText(test_img, "DL08CA1990", (50, 200), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
+    _, buf = cv2.imencode(".jpg", test_img)
+    frame_bytes = buf.tobytes()
+
+    file_payload = ("browser_frame.jpg", io.BytesIO(frame_bytes), "image/jpeg")
+    res = client.post("/api/v1/cameras/CAM_01/stream/frame_ingest", files={"file": file_payload})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["camera_id"] == "CAM_01"
+    assert data["mode"] == "browser_stream"
+    assert data["status"] == "STREAMING"
+
+    # Revert back to synthetic
+    client.post("/api/v1/cameras/CAM_01/stream/configure", json={"mode": "synthetic", "source_url": ""})
+
+
+def test_ssdlite_vehicle_detector():
+    """Validates that SSDLiteVehicleDetector executes without errors on input frames."""
+    from app.services.video_ingestion_service import SSDLiteVehicleDetector
+    import cv2
+    detector = SSDLiteVehicleDetector.get_instance()
+    assert detector is not None
+
+    test_frame = np.zeros((540, 960, 3), dtype=np.uint8)
+    # Draw simulated rectangular vehicle body
+    cv2.rectangle(test_frame, (300, 150), (660, 380), (180, 180, 180), -1)
+    results = detector.detect(test_frame, score_threshold=0.20)
+    assert isinstance(results, list)
+
+

@@ -58,17 +58,19 @@ EXTRACTION_PATTERNS = [
     # Bharat Series: e.g. 22BH6517A, 21BH2345AA, 22BH1234A
     (re.compile(r'([0-9]{2}BH[0-9]{4}[A-Z]{1,2})'), 3.8),
     (re.compile(r'([0-9]{2}BH[0-9]{1,4}[A-Z]{1,2})'), 3.4),
-    # Indian standard: e.g. KA01MJ5021, DL08CA1990, MH12DE1433, HR26DQ5551
+    # Indian standard: e.g. KA01MJ5021, DL08CA1990, MH12DE1433, HR26DQ5551, WB02AK4921
     (re.compile(r'([A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{3,4})'), 3.6),
+    # Indian single-digit or short RTO: e.g. DL3CAY4921, DL4C1234, WB02A1234
+    (re.compile(r'([A-Z]{2}[0-9][A-Z]{1,3}[0-9]{3,4})'), 3.5),
     # Common format without series: e.g. KA015021, DL4C1234
-    (re.compile(r'([A-Z]{2}[0-9]{1,2}[A-Z]{0,2}[0-9]{1,4})'), 2.6),
+    (re.compile(r'([A-Z]{2}[0-9]{1,2}[A-Z]{0,2}[0-9]{1,4})'), 2.8),
     # International / Custom alphanumeric: e.g. 7XYZ912, 3ABC456
     (re.compile(r'([0-9][A-Z]{3}[0-9]{3})'), 2.4),
     (re.compile(r'([A-Z]{3}[0-9]{3,4})'), 2.2),
     # Euro / UK format: e.g. AB12CDE
     (re.compile(r'([A-Z]{2}[0-9]{2}[A-Z]{3})'), 2.2),
-    # General alphanumeric 6-10 chars with both letters and numbers
-    (re.compile(r'([A-Z0-9]{6,10})'), 1.8),
+    # General alphanumeric 5-11 chars with letters and numbers
+    (re.compile(r'([A-Z0-9]{5,11})'), 1.8),
 ]
 
 # Strict pattern validators for final candidate scoring
@@ -76,11 +78,12 @@ PATTERNS = [
     (re.compile(r'^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$'), 3.8),
     (re.compile(r'^[0-9]{2}BH[0-9]{1,4}[A-Z]{1,2}$'), 3.4),
     (re.compile(r'^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{3,4}$'), 3.6),
-    (re.compile(r'^[A-Z]{2}[0-9]{1,2}[A-Z]{0,2}[0-9]{1,4}$'), 2.6),
+    (re.compile(r'^[A-Z]{2}[0-9][A-Z]{1,3}[0-9]{3,4}$'), 3.5),
+    (re.compile(r'^[A-Z]{2}[0-9]{1,2}[A-Z]{0,2}[0-9]{1,4}$'), 2.8),
     (re.compile(r'^[0-9][A-Z]{3}[0-9]{3}$'), 2.4),
     (re.compile(r'^[A-Z]{3}[0-9]{3,4}$'), 2.2),
     (re.compile(r'^[A-Z]{2}[0-9]{2}[A-Z]{3}$'), 2.2),
-    (re.compile(r'^[A-Z0-9]{4,11}$'), 1.5),
+    (re.compile(r'^[A-Z0-9]{4,11}$'), 1.6),
 ]
 
 ALPHA_TO_DIGIT = {
@@ -178,24 +181,31 @@ def _disambiguate_plate_text(candidate: str) -> str:
 
     # If first 2 chars form an Indian state or are both letters:
     if chars[0].isalpha() and chars[1].isalpha():
-        # Indices 2 and 3 MUST be digits (RTO district code 01-99)
-        if len(chars) >= 4:
+        # Standard full plates like KA01MJ5021 or DL08CA1990 (9 or 10 chars)
+        if len(chars) in (9, 10):
             if chars[2] in ALPHA_TO_DIGIT:
                 chars[2] = ALPHA_TO_DIGIT[chars[2]]
-            if chars[3] in ('L', 'A'):
-                chars[3] = '4'
-            elif chars[3] in ALPHA_TO_DIGIT:
+            if chars[3] in ALPHA_TO_DIGIT:
                 chars[3] = ALPHA_TO_DIGIT[chars[3]]
+            elif chars[3] in ('L', 'O', 'I'):
+                chars[3] = ALPHA_TO_DIGIT.get(chars[3], chars[3])
 
-        # Last 4 characters (registration digits) MUST be digits
-        last_4_start = len(chars) - 4
-        if last_4_start >= 4:
-            # Middle series letters (between index 4 and last 4 digits)
-            for idx in range(4, last_4_start):
+            # Registration digits (last 4) MUST be digits
+            for idx in range(len(chars) - 4, len(chars)):
+                if chars[idx] in ('O', 'D', 'Q'):
+                    chars[idx] = '0'
+                elif chars[idx] in ALPHA_TO_DIGIT:
+                    chars[idx] = ALPHA_TO_DIGIT[chars[idx]]
+
+            # Middle series letters (between index 4 and len-4) MUST be letters
+            for idx in range(4, len(chars) - 4):
                 if chars[idx] in DIGIT_TO_ALPHA:
                     chars[idx] = DIGIT_TO_ALPHA[chars[idx]]
-            # Final 4 characters
-            for idx in range(last_4_start, len(chars)):
+
+        # Short or single-digit RTO plates like DL3CAY4921 or DL4C1234
+        elif len(chars) >= 7 and chars[2].isdigit():
+            # Last 4 digits
+            for idx in range(len(chars) - 4, len(chars)):
                 if chars[idx] in ('O', 'D', 'Q'):
                     chars[idx] = '0'
                 elif chars[idx] in ALPHA_TO_DIGIT:
@@ -226,7 +236,7 @@ def _extract_plate_tokens(raw_str: str) -> List[Tuple[str, float]]:
     # Strip 'IND' if present at beginning of HSRP plate
     if cleaned.startswith('IND') and len(cleaned) >= 7:
         ind_stripped = cleaned[3:]
-        tokens.append((ind_stripped, 1.2))
+        tokens.append((ind_stripped, 1.25))
 
     # Test raw cleaned
     tokens.append((cleaned, 1.0))
@@ -283,7 +293,7 @@ def _score_candidate(candidate: str, raw_conf: float) -> float:
     if has_alpha and has_digit:
         score *= 1.5
     else:
-        score *= 0.35  # Heavily penalize purely alphabetic or purely numeric strings
+        score *= 0.40  # Penalize purely alphabetic or purely numeric strings
 
     # Check if Bharat Series plate: e.g. 22BH6517A
     is_bharat = bool(re.match(r'^[0-9]{2}BH[0-9]{1,4}[A-Z]{1,2}$', candidate))
@@ -297,17 +307,17 @@ def _score_candidate(candidate: str, raw_conf: float) -> float:
         if candidate[:2] in INDIAN_STATES:
             score *= 2.4
         else:
-            score *= 0.5  # Penalize non-existent state prefixes (e.g. UZ, QQ)
+            score *= 1.25  # Maintain viability for generic/international plates
 
-    # Length bonuses: Full complete plate (8-11 chars) vs short fragments
+    # Length bonuses: Full complete plate (7-11 chars) vs short fragments
     if 8 <= len(candidate) <= 10:
         score *= 1.6
-    elif len(candidate) == 7 or len(candidate) == 11:
+    elif len(candidate) in (7, 11):
         score *= 1.3
     elif len(candidate) == 6:
-        score *= 0.7
+        score *= 0.9
     elif len(candidate) <= 5:
-        score *= 0.35  # Heavily penalize 4-5 char fragments (like BH651)
+        score *= 0.45
 
     return score
 
@@ -337,25 +347,28 @@ def localize_plate_candidates(img_rgb: np.ndarray) -> List[Tuple[np.ndarray, Tup
     total_area = h * w
     candidates: List[Tuple[np.ndarray, Tuple[int, int, int, int], str]] = []
 
-    # Fast Path: If image is plate-shaped (aspect ratio 1.4 - 7.5),
-    # ALWAYS evaluate the full image first so pre-cropped user uploads resolve with full context.
-    aspect_ratio = w / float(max(1, h))
-    is_pre_cropped = (1.4 <= aspect_ratio <= 7.5)
-    if is_pre_cropped:
-        candidates.append((img_rgb, (0, 0, w, h), 'full_image'))
+    # 1. Primary Priority: Full image (essential for pre-cropped plates and steady plate targeting)
+    candidates.append((img_rgb, (0, 0, w, h), 'full_image'))
+
+    # 2. Central Viewfinder zone (for camera feeds or vehicles positioned in center of frame)
+    if h >= 180 and w >= 220:
+        cy1, cy2 = int(0.20 * h), int(0.85 * h)
+        cx1, cx2 = int(0.12 * w), int(0.88 * w)
+        center_crop = img_rgb[cy1:cy2, cx1:cx2]
+        if center_crop.size > 0:
+            candidates.append((center_crop, (cx1, cy1, cx2 - cx1, cy2 - cy1), 'center_viewfinder'))
 
     gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
+    contour_candidates: List[Tuple[float, Tuple[np.ndarray, Tuple[int, int, int, int], str]]] = []
 
-    # 1. Edge & Contour Morphology (Sobel-X) with wide horizontal kernel to bridge character gaps
+    # 3. Edge & Contour Morphology (Sobel-X)
     try:
         clahe = cv2.createCLAHE(clipLimit=2.2, tileGridSize=(8, 8))
         enhanced = clahe.apply(gray)
         sobelx = cv2.Sobel(enhanced, cv2.CV_8U, 1, 0, ksize=3)
         _, thresh = cv2.threshold(sobelx, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        # Multi-scale horizontal closing:
-        # Widen kernel to 45x7 to bridge wide spaces between year, series, and digits on Indian plates
-        kernel_wide = cv2.getStructuringElement(cv2.MORPH_RECT, (45, 7))
+        kernel_wide = cv2.getStructuringElement(cv2.MORPH_RECT, (35, 7))
         closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel_wide)
 
         contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -363,7 +376,6 @@ def localize_plate_candidates(img_rgb: np.ndarray) -> List[Tuple[np.ndarray, Tup
             x, y, cw, ch = cv2.boundingRect(c)
             aspect = cw / float(max(1, ch))
             area = cw * ch
-            # Standard 1-line plate: aspect 1.5-7.5, 2-line plate: 1.1-2.2
             if (1.5 <= aspect <= 7.5 or 1.1 <= aspect <= 2.2) and cw >= 35 and ch >= 10:
                 if 0.0004 * total_area <= area <= 0.45 * total_area:
                     mx = int(cw * 0.15)
@@ -374,25 +386,27 @@ def localize_plate_candidates(img_rgb: np.ndarray) -> List[Tuple[np.ndarray, Tup
                     y2 = min(h, y + ch + my)
                     crop = img_rgb[y1:y2, x1:x2]
                     if crop.size > 0 and crop.shape[0] >= 10 and crop.shape[1] >= 20:
-                        candidates.append((crop, (x1, y1, x2 - x1, y2 - y1), 'contour_sobel'))
+                        # Rank by proximity to ideal plate aspect ratio (3.5)
+                        diff = abs(aspect - 3.5)
+                        contour_candidates.append((diff, (crop, (x1, y1, x2 - x1, y2 - y1), 'contour_sobel')))
     except Exception as e:
-        print(f"[OCRImageService] Contour localization note: {e}")
+        pass
 
-    # 2. High-Contrast Luminance / Color Segmentation (White & Yellow plates)
+    # 4. Color & Contrast Segmentation (White & Yellow plates)
     try:
         hsv = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2HSV)
-        white_mask = cv2.inRange(hsv, np.array([0, 0, 140]), np.array([180, 55, 255]))
-        yellow_mask = cv2.inRange(hsv, np.array([15, 55, 110]), np.array([38, 255, 255]))
+        white_mask = cv2.inRange(hsv, np.array([0, 0, 130]), np.array([180, 60, 255]))
+        yellow_mask = cv2.inRange(hsv, np.array([12, 50, 100]), np.array([38, 255, 255]))
         color_mask = cv2.bitwise_or(white_mask, yellow_mask)
 
-        kernel_c = cv2.getStructuringElement(cv2.MORPH_RECT, (35, 7))
+        kernel_c = cv2.getStructuringElement(cv2.MORPH_RECT, (30, 7))
         closed_color = cv2.morphologyEx(color_mask, cv2.MORPH_CLOSE, kernel_c)
         contours_c, _ = cv2.findContours(closed_color, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for c in contours_c:
             x, y, cw, ch = cv2.boundingRect(c)
             aspect = cw / float(max(1, ch))
             area = cw * ch
-            if (1.8 <= aspect <= 7.0) and cw >= 40 and ch >= 12:
+            if (1.6 <= aspect <= 7.0) and cw >= 40 and ch >= 12:
                 if 0.0005 * total_area <= area <= 0.40 * total_area:
                     mx = int(cw * 0.12)
                     my = int(ch * 0.18)
@@ -402,33 +416,15 @@ def localize_plate_candidates(img_rgb: np.ndarray) -> List[Tuple[np.ndarray, Tup
                     y2 = min(h, y + ch + my)
                     crop = img_rgb[y1:y2, x1:x2]
                     if crop.size > 0:
-                        candidates.append((crop, (x1, y1, x2 - x1, y2 - y1), 'color_segmentation'))
+                        diff = abs(aspect - 3.5)
+                        contour_candidates.append((diff, (crop, (x1, y1, x2 - x1, y2 - y1), 'color_segmentation')))
     except Exception as e:
-        print(f"[OCRImageService] Color localization note: {e}")
+        pass
 
-    # 3. Vehicle Geometric Prior Windows (Plates are almost always in lower 65% of vehicle)
-    if h >= 220 and w >= 220:
-        # Lower-center bumper region (typically front or rear plate)
-        y1_lc = int(0.30 * h)
-        y2_lc = int(0.95 * h)
-        x1_lc = int(0.08 * w)
-        x2_lc = int(0.92 * w)
-        lc_crop = img_rgb[y1_lc:y2_lc, x1_lc:x2_lc]
-        if lc_crop.size > 0:
-            candidates.append((lc_crop, (x1_lc, y1_lc, x2_lc - x1_lc, y2_lc - y1_lc), 'geometric_lower_center'))
-
-        # Bottom bumper crop
-        y1_bb = int(0.45 * h)
-        y2_bb = int(1.0 * h)
-        x1_bb = int(0.05 * w)
-        x2_bb = int(0.95 * w)
-        bb_crop = img_rgb[y1_bb:y2_bb, x1_bb:x2_bb]
-        if bb_crop.size > 0:
-            candidates.append((bb_crop, (x1_bb, y1_bb, x2_bb - x1_bb, y2_bb - y1_bb), 'geometric_bottom_bumper'))
-
-    # 4. Full image fallback (if not already added as first priority)
-    if not is_pre_cropped:
-        candidates.append((img_rgb, (0, 0, w, h), 'full_image'))
+    # Pick top 2 most promising contour crops
+    contour_candidates.sort(key=lambda item: item[0])
+    for _, cand_tuple in contour_candidates[:2]:
+        candidates.append(cand_tuple)
 
     return candidates
 
@@ -441,12 +437,17 @@ def _normalize_crop_dimensions(crop_rgb: np.ndarray) -> np.ndarray:
     if cv2 is None:
         return crop_rgb
     ch, cw = crop_rgb.shape[:2]
+    # Add gentle border padding on plate-shaped crops to prevent boundary character clipping
+    if 1.4 <= (cw / float(max(1, ch))) <= 7.5:
+        crop_rgb = cv2.copyMakeBorder(crop_rgb, 8, 8, 14, 14, cv2.BORDER_CONSTANT, value=[255, 255, 255])
+        ch, cw = crop_rgb.shape[:2]
+
     if ch < 80:
         scale = 95.0 / max(1, ch)
         new_w = max(140, int(cw * scale))
         return cv2.resize(crop_rgb, (new_w, 95), interpolation=cv2.INTER_CUBIC)
-    elif max(ch, cw) > 1400:
-        scale = 1400.0 / max(ch, cw)
+    elif max(ch, cw) > 1200:
+        scale = 1100.0 / max(ch, cw)
         new_w = max(100, int(cw * scale))
         new_h = max(50, int(ch * scale))
         return cv2.resize(crop_rgb, (new_w, new_h), interpolation=cv2.INTER_AREA)
@@ -457,8 +458,7 @@ def _enhance_crop_variants(crop_rgb: np.ndarray) -> List[np.ndarray]:
     """
     Produces enhancement representations for plate crop:
     1. Normalized RGB
-    2. CLAHE contrast equalization
-    3. Bilateral filter edge-preserving smoothing
+    2. CLAHE contrast equalization (for shadowed or glare-affected plates)
     """
     normalized = _normalize_crop_dimensions(crop_rgb)
     variants = [normalized]
@@ -467,14 +467,11 @@ def _enhance_crop_variants(crop_rgb: np.ndarray) -> List[np.ndarray]:
 
     try:
         gray = cv2.cvtColor(normalized, cv2.COLOR_RGB2GRAY)
-        clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+        clahe = cv2.createCLAHE(clipLimit=2.2, tileGridSize=(8, 8))
         clahe_enhanced = clahe.apply(gray)
         variants.append(cv2.cvtColor(clahe_enhanced, cv2.COLOR_GRAY2RGB))
-
-        bilateral = cv2.bilateralFilter(clahe_enhanced, 7, 50, 50)
-        variants.append(cv2.cvtColor(bilateral, cv2.COLOR_GRAY2RGB))
-    except Exception as e:
-        print(f"[OCRImageService] Crop variant enhancement note: {e}")
+    except Exception:
+        pass
 
     return variants
 
@@ -692,15 +689,22 @@ def recognize_plate_from_array(
                                         'bbox': bbox
                                     })
 
-                    # Break early ONLY if we found an exceptional complete plate match (score >= 6.0 and length >= 8)
-                    top_matches = [c for c in scored_candidates if c['score'] >= 6.0 and len(c['plate']) >= 8]
+                    # FAST-PATH EARLY EXIT: If confident plate found (score >= 2.2 and len >= 6, or len >= 4 with conf >= 0.70), stop immediately!
+                    top_matches = [
+                        c for c in scored_candidates
+                        if (c['score'] >= 2.2 and len(c['plate']) >= 6) or (len(c['plate']) >= 4 and c['conf'] >= 0.70)
+                    ]
                     if top_matches:
                         break
 
                 except Exception as ocr_err:
                     print(f"[OCRImageService] Candidate {cand_idx} pass {var_idx} note: {ocr_err}")
 
-            if any(c['score'] >= 6.0 and len(c['plate']) >= 8 for c in scored_candidates):
+            if any((c['score'] >= 2.2 and len(c['plate']) >= 6) or (len(c['plate']) >= 4 and c['conf'] >= 0.70) for c in scored_candidates):
+                break
+
+            # Limit total candidate crops evaluated to at most 3
+            if cand_idx >= 2:
                 break
 
         # Select best candidate

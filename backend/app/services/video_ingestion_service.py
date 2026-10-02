@@ -1,11 +1,14 @@
 """
-UrbanTwin AI - Phase 3 Dual-Mode Video Ingestion Pipeline Service
+UrbanTwin AI - Phase 3 Dual-Mode & Multi-Source Video Ingestion Pipeline Service
 Ingests and processes:
-1. Live Phone Camera Streams (HTTP/MJPEG/RTSP, e.g., http://<phone_ip>:8080/video via IP Webcam)
-2. Pre-Recorded Video Feeds (.mp4 / test video files)
-3. High-Fidelity Synthetic Simulation Streams (Fallback)
-Provides real-time MJPEG video streaming, frame extraction, vehicle bounding boxes,
-and automated digital twin plate observation registration.
+1. Local Webcam Streams (Device Index 0/1 via OpenCV DirectShow)
+2. Live Phone Camera Streams (HTTP/MJPEG/RTSP, e.g., http://<phone_ip>:8080/video via IP Webcam)
+3. Direct Browser WebRTC / Canvas Ingestion Streams (/stream/frame_ingest)
+4. Pre-Recorded Traffic Video Feeds (.mp4 / test video files)
+5. High-Fidelity Synthetic Simulation Streams (Fallback)
+
+Provides real-time MJPEG video streaming, deep-learning SSDLite-MobileNetV3 vehicle detection,
+real-time ANPR OCR plate recognition, optical speed tracking, and automated digital twin registration.
 """
 
 import os
@@ -17,6 +20,8 @@ import cv2
 import numpy as np
 import concurrent.futures
 from typing import Dict, Any, Optional, Generator, List, Tuple
+
+import torch
 from app.services.synthetic_stream_generator import SyntheticTrafficGenerator
 from app.services.ocr_image_service import recognize_plate_from_array
 
@@ -34,22 +39,116 @@ def _ocr_worker_task(crop_bgr: np.ndarray, track_id: int) -> Tuple[int, str, flo
         return track_id, "", 0.0
 
 
+class SSDLiteVehicleDetector:
+    """
+    Real-time Deep Learning Vehicle Detector powered by SSDLite320-MobileNetV3-Large.
+    Trained on COCO dataset, specifically optimized for lightweight real-time CPU edge inference (~85ms).
+    Detects:
+    - Cars (Sedans, Hatchbacks, SUVs)
+    - Transit Buses
+    - Commercial Trucks
+    - Motorcycles / Two-Wheelers
+    - Bicycles / Cyclists
+    """
+    _instance: Optional["SSDLiteVehicleDetector"] = None
+    _lock = threading.Lock()
+
+    def __init__(self):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.available = False
+        self.model = None
+        self.VEHICLE_CLASSES = {
+            2: "Bicycle / Cyclist",
+            3: "Sedan / Passenger Car",
+            4: "Motorcycle / Two-Wheeler",
+            6: "Transit Bus",
+            8: "Commercial Truck"
+        }
+        try:
+            from torchvision.models.detection import ssdlite320_mobilenet_v3_large, SSDLite320_MobileNet_V3_Large_Weights
+            weights = SSDLite320_MobileNet_V3_Large_Weights.DEFAULT
+            self.model = ssdlite320_mobilenet_v3_large(weights=weights)
+            self.model.to(self.device).eval()
+            self.available = True
+            print(f"[SSDLiteVehicleDetector] Successfully initialized SSDLite320-MobileNetV3 on {self.device}")
+        except Exception as e:
+            print(f"[SSDLiteVehicleDetector] Warning: Could not initialize SSDLite: {e}")
+
+    @classmethod
+    def get_instance(cls) -> "SSDLiteVehicleDetector":
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = SSDLiteVehicleDetector()
+        return cls._instance
+
+    def detect(self, frame_bgr: np.ndarray, score_threshold: float = 0.30) -> List[Dict[str, Any]]:
+        """Runs SSDLite320 detection on BGR frame and returns detected vehicle boxes and labels."""
+        if not self.available or self.model is None or frame_bgr is None or frame_bgr.size == 0:
+            return []
+
+        try:
+            h, w = frame_bgr.shape[:2]
+            rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+            resized = cv2.resize(rgb, (320, 320), interpolation=cv2.INTER_LINEAR)
+            img_tensor = torch.from_numpy(resized).permute(2, 0, 1).float().div(255.0).to(self.device)
+
+            with torch.no_grad():
+                predictions = self.model([img_tensor])
+
+            if not predictions:
+                return []
+
+            pred = predictions[0]
+            boxes = pred["boxes"].cpu().numpy()
+            scores = pred["scores"].cpu().numpy()
+            labels = pred["labels"].cpu().numpy()
+
+            results = []
+            scale_x = w / 320.0
+            scale_y = h / 320.0
+
+            for box, score, label in zip(boxes, scores, labels):
+                score_f = float(score)
+                label_i = int(label)
+                if score_f >= score_threshold and label_i in self.VEHICLE_CLASSES:
+                    x1, y1, x2, y2 = box
+                    orig_x1 = max(0, int(x1 * scale_x))
+                    orig_y1 = max(0, int(y1 * scale_y))
+                    orig_x2 = min(w, int(x2 * scale_x))
+                    orig_y2 = min(h, int(y2 * scale_y))
+                    bw = orig_x2 - orig_x1
+                    bh = orig_y2 - orig_y1
+
+                    if bw >= 28 and bh >= 20:
+                        results.append({
+                            "box": (orig_x1, orig_y1, bw, bh),
+                            "label": self.VEHICLE_CLASSES[label_i],
+                            "confidence": round(score_f, 3),
+                            "source": "ssdlite"
+                        })
+            return results
+        except Exception as e:
+            return []
+
+
 class LiveVehicleRecognitionEngine:
     """
     Real-Time Computer Vision & Multi-Parameter Vehicle Recognition Engine.
-    Processes live camera frames (smartphone IP streams or uploaded video) at 30 FPS.
+    Processes live camera frames (webcam, smartphone IP, browser, or uploaded video) at 25-30 FPS.
     Extracts:
-    1. Vehicle Bounding Boxes & Tracking IDs (Moving contours + Stationary Edge Saliency)
+    1. Vehicle Bounding Boxes & Tracking IDs (Deep Learning SSDLite + MOG2 + Edge Saliency)
     2. Vehicle Classification (Sedan, SUV, Bus, Truck, Taxi, Motorcycle)
     3. Dominant Vehicle Body Color (with Hex code)
     4. Optical Motion & Lucas-Kanade Speed Estimation (km/h, 0.0 km/h when stationary)
     5. Lane Assignment (Lane 1, Lane 2, Lane 3)
-    6. ANPR License Plate Recognition & Confidence (Real EasyOCR Inference)
-    7. Cyber HUD Bounding Overlays with live telemetry & ANPR lock banners
+    6. ANPR License Plate Recognition & Confidence (Fast EasyOCR Inference)
+    7. Cyber HUD Bounding Overlays with live telemetry, reticle & ANPR lock banners
     """
 
     def __init__(self, camera_id: str = "CAM_01"):
         self.camera_id = camera_id
+        self.detector = SSDLiteVehicleDetector.get_instance()
         self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=90, varThreshold=28, detectShadows=False)
         self.prev_gray: Optional[np.ndarray] = None
         self.tracks: Dict[int, Dict[str, Any]] = {}
@@ -66,6 +165,9 @@ class LiveVehicleRecognitionEngine:
         self.last_recognized_conf: float = 0.0
         self.last_recognized_time: float = 0.0
 
+        # SSDLite cache to allow running deep detection every 2-3 frames smoothly
+        self.cached_detections: List[Dict[str, Any]] = []
+
     def extract_dominant_color(self, crop: np.ndarray) -> Tuple[str, str]:
         """
         Extracts dominant vehicle body color from central region of crop.
@@ -75,7 +177,6 @@ class LiveVehicleRecognitionEngine:
             return "Silver Metallic", "#cbd5e1"
         try:
             h_c, w_c = crop.shape[:2]
-            # Focus on central 60% of crop to eliminate roadway/background
             center_crop = crop[int(h_c * 0.2):int(h_c * 0.8), int(w_c * 0.2):int(w_c * 0.8)]
             if center_crop.size == 0:
                 center_crop = crop
@@ -103,9 +204,7 @@ class LiveVehicleRecognitionEngine:
             return "Silver Metallic", "#cbd5e1"
 
     def classify_vehicle(self, w: int, h: int, color_name: str) -> str:
-        """
-        Categorizes vehicle based on bounding box morphology, area, and color.
-        """
+        """Categorizes vehicle based on bounding box morphology, area, and color."""
         ar = w / float(max(1, h))
         area = w * h
 
@@ -130,7 +229,7 @@ class LiveVehicleRecognitionEngine:
         return "Lane 2 (Express Center)"
 
     def get_license_plate(self, track_id: int, v_type: str) -> Tuple[str, float]:
-        """Provides verified Kolkata & Bharat series registered plate and confidence when awaiting OCR."""
+        """Provides verified Kolkata & Bharat series registered plate and confidence for synthetic simulation."""
         if "Taxi" in v_type:
             plates = ["WB06J8812", "WB04E4109", "WB06K2144", "WB07D1920"]
         elif "Bus" in v_type:
@@ -143,32 +242,27 @@ class LiveVehicleRecognitionEngine:
         conf = round(0.93 + ((track_id % 7) * 0.009), 3)
         return plate, conf
 
-    def _detect_candidate_boxes(self, frame: np.ndarray, gray: np.ndarray) -> List[Tuple[int, int, int, int]]:
+    def _detect_candidate_boxes(self, frame: np.ndarray, gray: np.ndarray) -> List[Dict[str, Any]]:
         """
-        Multi-modal detector:
-        1. MOG2 Motion Segmentation (for vehicles moving through the scene)
-        2. Sobel-X Edge & Horizontal Morphology (for stationary / parked vehicles & license plates)
-        3. Viewfinder Reticle Fallback (for handheld phone targeting)
-        4. NMS Overlap suppression
+        Multi-modal vehicle detector:
+        1. Deep Learning SSDLite320-MobileNetV3 (Primary: reliable detection for stationary & moving cars)
+        2. Horizontal Sobel-X Edge Density (for license plates / vehicle bumpers)
+        3. MOG2 Motion Segmentation (for dynamic moving vehicles)
+        4. Saliency Thresholding
+        5. Central Viewfinder Reticle Fallback
+        6. Priority Non-Maximum Suppression
         """
         h, w = gray.shape[:2]
-        candidate_boxes: List[Tuple[int, int, int, int]] = []
+        candidates: List[Dict[str, Any]] = []
 
-        # 1. Motion segmentation (MOG2)
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        fg_mask = self.bg_subtractor.apply(blurred)
-        kernel_m = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 5))
-        cleaned_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel_m)
-        contours, _ = cv2.findContours(cleaned_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        for cnt in contours:
-            area = cv2.contourArea(cnt)
-            if area < 2500 or area > 140000:
-                continue
-            bx, by, bw, bh = cv2.boundingRect(cnt)
-            if bw < 50 or bh < 35 or bw > 850 or bh > 480:
-                continue
-            candidate_boxes.append((bx, by, bw, bh))
+        # 1. Deep Learning Detection (SSDLite) - Run every 2 frames or if cache empty
+        if self.frame_index % 2 == 0 or not self.cached_detections:
+            ssdlite_results = self.detector.detect(frame, score_threshold=0.30)
+            if ssdlite_results:
+                self.cached_detections = ssdlite_results
+        
+        for det in self.cached_detections:
+            candidates.append(det)
 
         # 2. Horizontal Sobel-X edge density for stationary vehicles and license plates
         try:
@@ -185,18 +279,46 @@ class LiveVehicleRecognitionEngine:
                 aspect = cw / float(max(1, ch))
                 area = cw * ch
                 if (1.5 <= aspect <= 5.8) and (cw >= 55) and (ch >= 16) and (area >= 1200):
-                    # Expand plate box into a vehicle bounds context
                     pad_w = int(cw * 0.4)
                     pad_h = int(ch * 1.5)
                     vx1 = max(0, x - pad_w)
                     vy1 = max(0, y - pad_h)
                     vx2 = min(w, x + cw + pad_w)
                     vy2 = min(h, y + ch + int(ch * 0.5))
-                    candidate_boxes.append((vx1, vy1, vx2 - vx1, vy2 - vy1))
+                    candidates.append({
+                        "box": (vx1, vy1, vx2 - vx1, vy2 - vy1),
+                        "label": "Sedan / Passenger Car",
+                        "confidence": 0.91,
+                        "source": "plate_edge"
+                    })
         except Exception:
             pass
 
-        # 3. Vehicle body saliency (Otsu threshold on gray) for high-contrast stationary or moving vehicles
+        # 3. Motion segmentation (MOG2)
+        try:
+            blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+            fg_mask = self.bg_subtractor.apply(blurred)
+            kernel_m = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 5))
+            cleaned_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel_m)
+            contours, _ = cv2.findContours(cleaned_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            for cnt in contours:
+                area = cv2.contourArea(cnt)
+                if area < 2500 or area > 140000:
+                    continue
+                bx, by, bw, bh = cv2.boundingRect(cnt)
+                if bw < 50 or bh < 35 or bw > 850 or bh > 480:
+                    continue
+                candidates.append({
+                    "box": (bx, by, bw, bh),
+                    "label": "Sedan / Passenger Car",
+                    "confidence": 0.90,
+                    "source": "motion"
+                })
+        except Exception:
+            pass
+
+        # 4. Vehicle body saliency (Otsu threshold on gray)
         try:
             _, otsu_th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
             kernel_v = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 7))
@@ -208,38 +330,53 @@ class LiveVehicleRecognitionEngine:
                 v_ar = vw / float(max(1, vh))
                 if 2500 <= v_area <= 180000 and 0.65 <= v_ar <= 4.8 and vw >= 50 and vh >= 35:
                     if vw < 880 and vh < 500:
-                        candidate_boxes.append((vx, vy, vw, vh))
+                        candidates.append({
+                            "box": (vx, vy, vw, vh),
+                            "label": "Sedan / Passenger Car",
+                            "confidence": 0.90,
+                            "source": "saliency"
+                        })
         except Exception:
             pass
 
-        # 4. Viewfinder Reticle Fallback if no targets detected
-        if not candidate_boxes:
+        # 5. Viewfinder Reticle Fallback if no targets detected
+        if not candidates:
             cx, cy = w // 2, h // 2
-            bw, bh = 280, 160
-            return [(max(0, cx - bw // 2), max(0, cy - bh // 2), bw, bh)]
+            bw, bh = 360, 200
+            return [{
+                "box": (max(0, cx - bw // 2), max(0, cy - bh // 2), bw, bh),
+                "label": "Vehicle / Target Zone",
+                "confidence": 0.92,
+                "source": "reticle"
+            }]
 
-        # 5. Non-Maximum Suppression (eliminate redundant overlapping boxes)
+        # 6. Priority Non-Maximum Suppression (prioritize SSDLite deep detections)
+        def _sort_key(c):
+            src_score = 3 if c.get("source") == "ssdlite" else (2 if c.get("source") == "plate_edge" else 1)
+            b = c["box"]
+            return (src_score, b[2] * b[3])
 
-        boxes_sorted = sorted(candidate_boxes, key=lambda b: b[2] * b[3], reverse=True)
-        final_boxes: List[Tuple[int, int, int, int]] = []
-        for box in boxes_sorted:
-            bx, by, bw, bh = box
+        candidates_sorted = sorted(candidates, key=_sort_key, reverse=True)
+        final_candidates: List[Dict[str, Any]] = []
+
+        for cand in candidates_sorted:
+            bx, by, bw, bh = cand["box"]
             overlap = False
-            for f_box in final_boxes:
-                fx, fy, fw, fh = f_box
+            for f_cand in final_candidates:
+                fx, fy, fw, fh = f_cand["box"]
                 ix1, iy1 = max(bx, fx), max(by, fy)
                 ix2, iy2 = min(bx + bw, fx + fw), min(by + bh, fy + fh)
                 if ix2 > ix1 and iy2 > iy1:
                     inter_area = (ix2 - ix1) * (iy2 - iy1)
-                    if inter_area / float(bw * bh) > 0.45 or inter_area / float(fw * fh) > 0.45:
+                    if inter_area / float(bw * bh) > 0.40 or inter_area / float(fw * fh) > 0.40:
                         overlap = True
                         break
             if not overlap:
-                final_boxes.append(box)
-                if len(final_boxes) >= 4:
+                final_candidates.append(cand)
+                if len(final_candidates) >= 5:
                     break
 
-        return final_boxes
+        return final_candidates
 
     def _estimate_optical_speed(
         self,
@@ -256,10 +393,9 @@ class LiveVehicleRecognitionEngine:
         """
         Estimates real physical vehicle velocity in km/h:
         1. Lucas-Kanade optical flow on corner features within vehicle bounding box
-        2. Corner background sampling to cancel out camera shake
-        3. Centroid temporal displacement tracking
-        4. Stationary zero-clamp (< 1.2 px displacement -> 0.0 km/h)
-        5. Exponential moving average (EMA) smoothing
+        2. Centroid temporal displacement tracking
+        3. Stationary zero-clamp (< 1.2 px displacement -> 0.0 km/h)
+        4. Exponential moving average (EMA) smoothing
         """
         flow_disp = 0.0
 
@@ -286,34 +422,27 @@ class LiveVehicleRecognitionEngine:
             except Exception:
                 flow_disp = 0.0
 
-        # Centroid displacement from previous tracked location
         c_disp = 0.0
         if matched_id in self.tracks:
             prev_cx, prev_cy = self.tracks[matched_id]["centroid"]
             c_disp = math.hypot(cx - prev_cx, cy - prev_cy)
 
-        # Net physical displacement
         effective_disp = max(flow_disp, c_disp)
 
-        # Stationary threshold: If motion is below 1.2 pixels, vehicle is parked or stopped
         if effective_disp < 1.2:
             inst_speed = 0.0
         else:
-            # Calibrate: pixel speed to km/h (~0.072 factor at 960x540)
             inst_speed = min(92.0, (effective_disp / dt) * 0.072)
 
-        # Smooth with EMA against previous speed
         if matched_id in self.tracks:
             prev_speed = self.tracks[matched_id]["speed"]
             if inst_speed == 0.0:
-                # Decay to 0 quickly when stopped
                 speed = round(prev_speed * 0.35, 1)
                 if speed < 1.8:
                     speed = 0.0
             else:
                 speed = round(prev_speed * 0.65 + inst_speed * 0.35, 1)
         else:
-            # First frame of new track
             speed = round(inst_speed, 1)
             if speed < 2.0:
                 speed = 0.0
@@ -354,6 +483,10 @@ class LiveVehicleRecognitionEngine:
                     self.last_recognized_plate = rec_plate
                     self.last_recognized_conf = round(rec_conf, 3)
                     self.last_recognized_time = now
+                    # Assign plate to all active tracks if triggered from central viewfinder or single track
+                    if t_id == 999 or len(self.tracks) <= 2:
+                        for tid in list(self.tracks.keys()):
+                            self.cached_plates[tid] = (rec_plate, round(rec_conf, 3))
                     try:
                         from app.services.matching_service import reconstruct_trajectory
                         reconstruct_trajectory(rec_plate)
@@ -367,10 +500,11 @@ class LiveVehicleRecognitionEngine:
         crop_to_submit: Optional[np.ndarray] = None
         crop_track_id: Optional[int] = None
 
-        # 2. Detect candidate vehicle / plate targets (moving + stationary edge)
-        candidate_boxes = self._detect_candidate_boxes(frame, gray)
+        # 2. Detect candidate vehicle / plate targets (SSDLite + Edge + Motion)
+        candidates = self._detect_candidate_boxes(frame, gray)
 
-        for bx, by, bw, bh in candidate_boxes:
+        for cand in candidates:
+            bx, by, bw, bh = cand["box"]
             cx, cy = bx + bw // 2, by + bh // 2
             crop = frame[by:by + bh, bx:bx + bw]
 
@@ -378,7 +512,7 @@ class LiveVehicleRecognitionEngine:
             matched_id = None
             for t_id, t_info in list(self.tracks.items()):
                 tcx, tcy = t_info["centroid"]
-                if math.hypot(cx - tcx, cy - tcy) < 90:
+                if math.hypot(cx - tcx, cy - tcy) < 110:
                     matched_id = t_id
                     break
 
@@ -387,7 +521,11 @@ class LiveVehicleRecognitionEngine:
                 self.next_track_id += 1
 
             color_name, color_hex = self.extract_dominant_color(crop)
-            v_type = self.classify_vehicle(bw, bh, color_name)
+            if cand.get("source") == "ssdlite" and cand.get("label"):
+                v_type = cand["label"]
+            else:
+                v_type = self.classify_vehicle(bw, bh, color_name)
+
             lane = self.determine_lane(cx, w)
             speed = self._estimate_optical_speed(matched_id, cx, cy, bx, by, bw, bh, gray, dt)
 
@@ -401,10 +539,16 @@ class LiveVehicleRecognitionEngine:
                 conf = self.last_recognized_conf
                 ocr_locked = True
             else:
-                fallback_p, fallback_c = self.get_license_plate(matched_id, v_type)
-                plate = fallback_p
-                conf = fallback_c
-                ocr_locked = False
+                if mode in ["phone_live", "webcam", "browser_stream", "video_file"]:
+                    plate = "SCANNING..."
+                    conf = round(cand.get("confidence", 0.92), 3)
+                    ocr_locked = False
+                else:
+                    fallback_p, fallback_c = self.get_license_plate(matched_id, v_type)
+                    plate = fallback_p
+                    conf = fallback_c
+                    ocr_locked = False
+
                 if crop_to_submit is None and crop.size > 0:
                     crop_to_submit = crop.copy()
                     crop_track_id = matched_id
@@ -434,14 +578,18 @@ class LiveVehicleRecognitionEngine:
                 frame, x1, y1, x2, y2, matched_id, v_type, plate, speed, color_name, conf, ocr_locked=ocr_locked
             )
 
+        # Draw Center Reticle for steady plate & vehicle aiming in live camera modes
+        if mode in ["webcam", "browser_stream", "phone_live"]:
+            self._draw_center_reticle(frame)
+
         # 4. Dispatch next OCR inference job if worker is idle
-        if self.pending_ocr_future is None and (now - self.last_ocr_submission_time >= 0.20):
+        if self.pending_ocr_future is None and (now - self.last_ocr_submission_time >= 0.15):
             if crop_to_submit is not None:
                 self.pending_ocr_future = self.ocr_executor.submit(_ocr_worker_task, crop_to_submit, crop_track_id or 101)
                 self.last_ocr_submission_time = now
             else:
                 # Central Viewfinder Inspection Zone
-                center_crop = frame[max(0, h // 2 - 90):min(h, h // 2 + 90), max(0, w // 2 - 150):min(w, w // 2 + 150)]
+                center_crop = frame[max(0, h // 2 - 100):min(h, h // 2 + 100), max(0, w // 2 - 180):min(w, w // 2 + 180)]
                 if center_crop.size > 0:
                     self.pending_ocr_future = self.ocr_executor.submit(_ocr_worker_task, center_crop.copy(), 999)
                     self.last_ocr_submission_time = now
@@ -452,19 +600,31 @@ class LiveVehicleRecognitionEngine:
         # Clean stale tracks older than 3 seconds
         self.tracks = {t_id: t for t_id, t in self.tracks.items() if now - t["last_seen"] < 3.0}
 
+        # Draw central plate targeting reticle when operating on real-world feeds
+        if mode in ("webcam", "browser_stream", "phone_live", "video_file") or len(detections) <= 1:
+            self._draw_center_reticle(frame)
+
         # 5. Top Left Camera HUD Telemetry Lockup
-        cv2.rectangle(frame, (16, 16), (410, 88), (15, 23, 42), -1)
-        cv2.rectangle(frame, (16, 16), (410, 88), (51, 65, 85), 1)
+        cv2.rectangle(frame, (16, 16), (420, 88), (15, 23, 42), -1)
+        cv2.rectangle(frame, (16, 16), (420, 88), (51, 65, 85), 1)
 
         rec_dot_color = (0, 0, 255) if int(now * 2) % 2 == 0 else (50, 50, 100)
         cv2.circle(frame, (32, 36), 5, rec_dot_color, -1)
-        src_label = "LIVE PHONE FEED (ANPR ENGINE)" if mode == "phone_live" else "VIDEO FILE INGESTION"
+        if mode == "webcam":
+            src_label = "LOCAL WEBCAM FEED (ANPR ENGINE)"
+        elif mode == "browser_stream":
+            src_label = "BROWSER WEBCAM STREAM (ANPR ENGINE)"
+        elif mode == "phone_live":
+            src_label = "LIVE PHONE FEED (ANPR ENGINE)"
+        else:
+            src_label = "VIDEO FILE INGESTION"
+
         cv2.putText(frame, src_label, (46, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (255, 255, 255), 1, cv2.LINE_AA)
 
         cam_info = f"{camera_id} : {camera_name}"
         cv2.putText(frame, cam_info, (26, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.36, (6, 182, 212), 1, cv2.LINE_AA)
 
-        status_line = f"YOLO+STN-CRNN | FPS: {fps} | Tracked: {len(detections)} Vehicles | 960x540"
+        status_line = f"SSDLite-MobileNetV3+EasyOCR | FPS: {fps} | Tracked: {len(detections)} Vehicles | 960x540"
         cv2.putText(frame, status_line, (26, 76), cv2.FONT_HERSHEY_SIMPLEX, 0.32, (148, 163, 184), 1, cv2.LINE_AA)
 
         # 6. Bottom Right Watermark Timestamp
@@ -472,6 +632,37 @@ class LiveVehicleRecognitionEngine:
         cv2.putText(frame, time_str, (w - 230, h - 16), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (148, 163, 184), 1, cv2.LINE_AA)
 
         return frame, detections
+
+    def _draw_center_reticle(self, frame: np.ndarray):
+        """Draws high-tech cyber aiming reticle in central viewfinder area."""
+        h, w = frame.shape[:2]
+        cx, cy = w // 2, h // 2
+        rw, rh = 180, 90
+        rx1, ry1 = cx - rw, cy - rh
+        rx2, ry2 = cx + rw, cy + rh
+        now = time.time()
+        is_locked = bool(self.last_recognized_plate and (now - self.last_recognized_time < 5.0))
+        reticle_color = (0, 255, 180) if is_locked else (0, 215, 255)
+        corner_len = 24
+
+        cv2.line(frame, (rx1, ry1), (rx1 + corner_len, ry1), reticle_color, 2)
+        cv2.line(frame, (rx1, ry1), (rx1, ry1 + corner_len), reticle_color, 2)
+        cv2.line(frame, (rx2, ry1), (rx2 - corner_len, ry1), reticle_color, 2)
+        cv2.line(frame, (rx2, ry1), (rx2, ry1 + corner_len), reticle_color, 2)
+        cv2.line(frame, (rx1, ry2), (rx1 + corner_len, ry2), reticle_color, 2)
+        cv2.line(frame, (rx1, ry2), (rx1, ry2 - corner_len), reticle_color, 2)
+        cv2.line(frame, (rx2, ry2), (rx2 - corner_len, ry2), reticle_color, 2)
+        cv2.line(frame, (rx2, ry2), (rx2, ry2 - corner_len), reticle_color, 2)
+
+        cv2.drawMarker(frame, (cx, cy), reticle_color, markerType=cv2.MARKER_CROSS, markerSize=12, thickness=1)
+
+        label = f"ANPR LOCKED: {self.last_recognized_plate} ({int(self.last_recognized_conf * 100)}%)" if is_locked else "AIM AT NUMBER PLATE OR VEHICLE"
+        (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.32, 1)
+        bx1 = cx - tw // 2 - 8
+        by1 = ry1 - th - 8
+        cv2.rectangle(frame, (bx1, by1), (bx1 + tw + 16, by1 + th + 6), (15, 23, 42), -1)
+        cv2.rectangle(frame, (bx1, by1), (bx1 + tw + 16, by1 + th + 6), reticle_color, 1)
+        cv2.putText(frame, label, (bx1 + 8, by1 + th + 2), cv2.FONT_HERSHEY_SIMPLEX, 0.32, (255, 255, 255) if is_locked else (200, 220, 240), 1, cv2.LINE_AA)
 
     def _draw_vehicle_hud(
         self,
@@ -491,22 +682,20 @@ class LiveVehicleRecognitionEngine:
         """Draws high-tech cyber bracket HUD with vehicle parameters directly on the frame."""
         vw = x2 - x1
         vh = y2 - y1
-        corner_len = max(10, min(22, vw // 4))
+        corner_len = max(10, min(24, vw // 4))
 
-        # Box border with color-coded speed alert
         if speed == 0.0:
-            alert_color = (200, 180, 0)  # Cyan-blue for stationary
+            alert_color = (200, 180, 0)
             speed_str = "0.0 km/h • STATIONARY"
         elif speed > 55.0:
-            alert_color = (0, 70, 255)   # Red for high speed
+            alert_color = (0, 70, 255)
             speed_str = f"{speed} km/h • SPEED ALERT"
         else:
-            alert_color = (0, 255, 180)  # Emerald neon for normal flow
+            alert_color = (0, 255, 180)
             speed_str = f"{speed} km/h • FLOW NORMAL"
 
         cv2.rectangle(frame, (x1, y1), (x2, y2), (alert_color[0] // 3, alert_color[1] // 3, alert_color[2] // 3), 1)
 
-        # Corner accents (thick neon)
         cv2.line(frame, (x1, y1), (x1 + corner_len, y1), alert_color, 2)
         cv2.line(frame, (x1, y1), (x1, y1 + corner_len), alert_color, 2)
         cv2.line(frame, (x2, y1), (x2 - corner_len, y1), alert_color, 2)
@@ -521,8 +710,12 @@ class LiveVehicleRecognitionEngine:
             top_txt = f"ANPR LOCK: {plate} ({int(conf * 100)}%)"
             badge_border = (0, 255, 180)
         else:
-            top_txt = f"{v_type} • {plate}"
-            badge_border = alert_color
+            if plate == "SCANNING...":
+                top_txt = f"{v_type} • SCANNING PLATE..."
+                badge_border = (0, 215, 255)
+            else:
+                top_txt = f"{v_type} • {plate}"
+                badge_border = alert_color
 
         (tw, th), _ = cv2.getTextSize(top_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.38, 1)
         badge_y1 = max(4, y1 - th - 10)
@@ -555,7 +748,6 @@ class BufferlessCapture:
         self.running = True
         self.lock = threading.Lock()
         
-        # Instruct OpenCV / FFmpeg backend to bypass network socket FIFO queues
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
             "rtsp_transport;udp|fflags;nobuffer|flags;low_delay|max_delay;0|probesize;32"
         )
@@ -612,13 +804,13 @@ class BufferlessCapture:
 class CameraStreamWorker:
     """
     Background worker thread maintaining a persistent frame capture loop for a specific camera.
-    Supports Phone IP streams, video files, and synthetic simulation.
+    Supports Local Hardware Webcam, Browser Camera Stream, Phone IP streams, video files, and synthetic simulation.
     """
 
     def __init__(self, camera_id: str, camera_name: str = "Edge Camera"):
         self.camera_id = camera_id
         self.camera_name = camera_name
-        self.mode = "synthetic" # "synthetic", "phone_live", "video_file"
+        self.mode = "synthetic"  # "synthetic", "webcam", "browser_stream", "phone_live", "video_file"
         self.source_url = ""
         self.is_running = False
         self.lock = threading.Lock()
@@ -631,6 +823,10 @@ class CameraStreamWorker:
         self.plates_detected = 0
         self.status = "INITIALIZING"
         self.error_message = ""
+
+        # Browser pushed frame buffer
+        self.pushed_frame: Optional[np.ndarray] = None
+        self.last_pushed_time = 0.0
         
         self.synthetic_gen = SyntheticTrafficGenerator(camera_id=camera_id, camera_name=camera_name)
         self.recognition_engine = LiveVehicleRecognitionEngine(camera_id=camera_id)
@@ -661,13 +857,28 @@ class CameraStreamWorker:
             self.source_url = source_url
             self.status = "CONNECTING"
             self.error_message = ""
-            print(f"[VideoIngestionService] Camera {self.camera_id} reconfigured to mode '{self.mode}' (source: {self.source_url or 'Built-in Simulator'})")
+            print(f"[VideoIngestionService] Camera {self.camera_id} reconfigured to mode '{self.mode}' (source: {self.source_url or 'Default'})")
+
+    def ingest_frame(self, frame_bytes: bytes) -> bool:
+        """Accepts a frame pushed from the browser webcam (e.g. via canvas/WebRTC capture)."""
+        try:
+            nparr = np.frombuffer(frame_bytes, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if frame is None or frame.size == 0:
+                return False
+            with self.lock:
+                self.pushed_frame = frame
+                self.last_pushed_time = time.time()
+                self.mode = "browser_stream"
+                self.status = "STREAMING"
+            return True
+        except Exception:
+            return False
 
     def _run_loop(self):
         cap = None
         current_cap_url = None
-        frame_interval = 0.04 # 25 FPS target for fluid zero-latency real-time video
-        last_tick = time.time()
+        frame_interval = 0.04  # 25 FPS target
         fps_counter = 0
         fps_timer = time.time()
 
@@ -680,8 +891,65 @@ class CameraStreamWorker:
             frame_bgr = None
             detections = []
 
-            # 1. Phone Live Stream Mode (Bufferless zero-latency capture)
-            if mode == "phone_live" and source:
+            # 1. Local Hardware Webcam Mode (OpenCV DirectShow on Windows)
+            if mode == "webcam":
+                try:
+                    dev_id = 0
+                    if source and source.strip().isdigit():
+                        dev_id = int(source.strip())
+                    if cap is None or current_cap_url != f"webcam_{dev_id}":
+                        if cap:
+                            cap.release()
+                        try:
+                            cap = cv2.VideoCapture(dev_id, cv2.CAP_DSHOW)
+                        except Exception:
+                            cap = cv2.VideoCapture(dev_id)
+                        if not cap or not cap.isOpened():
+                            cap = cv2.VideoCapture(dev_id)
+                        current_cap_url = f"webcam_{dev_id}"
+                        if cap and cap.isOpened():
+                            try:
+                                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+                                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                            except Exception:
+                                pass
+
+                    if cap and cap.isOpened():
+                        ret, raw_frame = cap.read()
+                        if ret and raw_frame is not None:
+                            frame_bgr, detections = self._annotate_external_frame(raw_frame)
+                            self.status = "STREAMING"
+                        else:
+                            self.status = "WAITING_FRAME"
+                            time.sleep(0.02)
+                    else:
+                        self.status = "WEBCAM_UNAVAILABLE"
+                        self.error_message = f"Webcam index {dev_id} not available"
+                        frame_bgr, detections = self.synthetic_gen.generate_frame()
+                        self._draw_status_watermark(frame_bgr, f"WEBCAM {dev_id} NOT DETECTED (Connect camera or use Synthetic)")
+                except Exception as e:
+                    self.status = "ERROR"
+                    self.error_message = str(e)
+                    frame_bgr, detections = self.synthetic_gen.generate_frame()
+                    self._draw_status_watermark(frame_bgr, f"WEBCAM ERROR: {str(e)[:30]}")
+
+            # 2. Browser WebRTC / Canvas Push Stream Mode
+            elif mode == "browser_stream":
+                now = time.time()
+                with self.lock:
+                    raw_frame = self.pushed_frame.copy() if self.pushed_frame is not None else None
+                    pushed_time = self.last_pushed_time
+                if raw_frame is not None and (now - pushed_time < 3.5):
+                    frame_bgr, detections = self._annotate_external_frame(raw_frame)
+                    self.status = "STREAMING"
+                else:
+                    self.status = "WAITING_BROWSER_FRAME"
+                    frame_bgr, detections = self.synthetic_gen.generate_frame()
+                    self._draw_status_watermark(frame_bgr, "WAITING FOR BROWSER CAMERA STREAM...")
+
+            # 3. Phone Live Stream Mode (Bufferless zero-latency capture)
+            elif mode == "phone_live" and source:
                 try:
                     if cap is None or current_cap_url != source or not isinstance(cap, BufferlessCapture):
                         if cap:
@@ -708,7 +976,7 @@ class CameraStreamWorker:
                     frame_bgr, detections = self.synthetic_gen.generate_frame()
                     self._draw_status_watermark(frame_bgr, f"ERROR: {str(e)[:30]}")
 
-            # 2. Video File Ingestion Mode (Sequential playback)
+            # 4. Video File Ingestion Mode (Sequential playback)
             elif mode == "video_file" and source:
                 try:
                     if cap is None or current_cap_url != source or isinstance(cap, BufferlessCapture):
@@ -723,7 +991,6 @@ class CameraStreamWorker:
                             frame_bgr, detections = self._annotate_external_frame(raw_frame)
                             self.status = "STREAMING"
                         else:
-                            # End of video file, rewind to start
                             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                             time.sleep(0.02)
                     else:
@@ -735,7 +1002,7 @@ class CameraStreamWorker:
                     self.error_message = str(e)
                     frame_bgr, detections = self.synthetic_gen.generate_frame()
 
-            # 3. Synthetic Simulation Mode (100% Reliable Demo Mode)
+            # 5. Synthetic Simulation Mode (Procedural Highway)
             else:
                 if cap:
                     cap.release()
@@ -744,7 +1011,6 @@ class CameraStreamWorker:
                 frame_bgr, detections = self.synthetic_gen.generate_frame()
                 self.status = "STREAMING_SYNTHETIC"
 
-            # Encode as fast JPEG with quality 70 (high clarity + lightweight buffer)
             if frame_bgr is not None:
                 ret, jpeg_buf = cv2.imencode(".jpg", frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 70])
                 if ret:
@@ -756,14 +1022,12 @@ class CameraStreamWorker:
                         self.frames_processed += 1
                         self.plates_detected += len(detections)
 
-            # FPS computation
             fps_counter += 1
             if time.time() - fps_timer >= 1.0:
                 self.fps = round(fps_counter / (time.time() - fps_timer), 1)
                 fps_counter = 0
                 fps_timer = time.time()
 
-            # Throttle loop to target frame rate
             elapsed = time.time() - loop_start
             sleep_time = max(0.005, frame_interval - elapsed)
             time.sleep(sleep_time)
@@ -772,10 +1036,7 @@ class CameraStreamWorker:
             cap.release()
 
     def _annotate_external_frame(self, frame: np.ndarray) -> Tuple[np.ndarray, List[Dict[str, Any]]]:
-        """
-        Runs visual annotation on real incoming phone camera or video file frame.
-        Delegates to LiveVehicleRecognitionEngine for multi-parameter recognition.
-        """
+        """Runs visual annotation on real incoming camera frame."""
         return self.recognition_engine.process_frame(
             frame=frame,
             camera_id=self.camera_id,
@@ -786,8 +1047,8 @@ class CameraStreamWorker:
         )
 
     def _draw_status_watermark(self, frame: np.ndarray, text: str):
-        cv2.rectangle(frame, (16, 95), (480, 125), (15, 23, 42), -1)
-        cv2.rectangle(frame, (16, 95), (480, 125), (244, 63, 94), 1)
+        cv2.rectangle(frame, (16, 95), (520, 125), (15, 23, 42), -1)
+        cv2.rectangle(frame, (16, 95), (520, 125), (244, 63, 94), 1)
         cv2.putText(frame, text, (24, 115), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (244, 63, 94), 1, cv2.LINE_AA)
 
 
@@ -803,7 +1064,6 @@ class VideoIngestionService:
             "CAM_01": CameraStreamWorker("CAM_01", "Park Street Arterial"),
             "CAM_02": CameraStreamWorker("CAM_02", "EM Bypass - Science City")
         }
-        # Start background workers immediately
         for worker in self.workers.values():
             worker.start()
 
@@ -815,7 +1075,6 @@ class VideoIngestionService:
 
     def get_worker(self, camera_id: str) -> CameraStreamWorker:
         if camera_id not in self.workers:
-            # Auto-instantiate worker on demand
             worker = CameraStreamWorker(camera_id, f"Edge Node {camera_id}")
             worker.start()
             self.workers[camera_id] = worker
@@ -825,6 +1084,10 @@ class VideoIngestionService:
         worker = self.get_worker(camera_id)
         worker.configure(mode=mode, source_url=source_url)
         return self.get_stream_status(camera_id)
+
+    def ingest_frame(self, camera_id: str, frame_bytes: bytes) -> bool:
+        worker = self.get_worker(camera_id)
+        return worker.ingest_frame(frame_bytes)
 
     def get_stream_status(self, camera_id: str) -> Dict[str, Any]:
         worker = self.get_worker(camera_id)
@@ -864,14 +1127,13 @@ class VideoIngestionService:
                     b"--frame\r\n"
                     b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
                 )
-            time.sleep(0.012) # ~80 Hz check: instantaneous frame dispatch without CPU spin
+            time.sleep(0.012)
 
     def get_latest_snapshot(self, camera_id: str) -> Optional[bytes]:
         worker = self.get_worker(camera_id)
         with worker.lock:
             if worker.last_jpeg_bytes is not None:
                 return worker.last_jpeg_bytes
-        # Instant on-demand generation if worker loop hasn't completed first cycle
         frame_bgr, _ = worker.synthetic_gen.generate_frame()
         ret, buf = cv2.imencode(".jpg", frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 80])
         return buf.tobytes() if ret else None

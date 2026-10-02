@@ -2552,20 +2552,31 @@ let activeSnapshotCamera = 'CAM_01';
 
 window.setCameraStreamMode = async function (camId, mode) {
   const btnSynth = document.getElementById(`btn-mode-synth-${camId}`);
+  const btnWebcam = document.getElementById(`btn-mode-webcam-${camId}`);
   const btnPhone = document.getElementById(`btn-mode-phone-${camId}`);
   const btnUpload = document.getElementById(`btn-mode-upload-${camId}`);
+  const panelWebcam = document.getElementById(`panel-webcam-${camId}`);
   const panelPhone = document.getElementById(`panel-phone-${camId}`);
   const panelUpload = document.getElementById(`panel-upload-${camId}`);
   const modeLabel = document.getElementById(`current-mode-${camId.toLowerCase()}`);
 
-  [btnSynth, btnPhone, btnUpload].forEach(btn => {
+  [btnSynth, btnWebcam, btnPhone, btnUpload].forEach(btn => {
     if (btn) {
       btn.className = "p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center space-x-1";
     }
   });
 
+  if (panelWebcam) panelWebcam.classList.add('hidden');
   if (panelPhone) panelPhone.classList.add('hidden');
   if (panelUpload) panelUpload.classList.add('hidden');
+
+  // Stop browser webcam stream if active for this camera
+  if (window._browserStreams && window._browserStreams[camId]) {
+    window._browserStreams[camId].stop();
+    delete window._browserStreams[camId];
+    const lbl = document.getElementById(`label-browser-cam-${camId}`);
+    if (lbl) lbl.textContent = "Browser Cam";
+  }
 
   if (mode === 'synthetic') {
     if (btnSynth) btnSynth.className = "p-2 rounded-lg bg-cyan-600/30 border border-cyan-500/40 text-white transition flex items-center justify-center space-x-1";
@@ -2581,6 +2592,12 @@ window.setCameraStreamMode = async function (camId, mode) {
     } catch (err) {
       console.error(`Error configuring ${camId} synthetic mode:`, err);
     }
+  } else if (mode === 'webcam') {
+    if (btnWebcam) btnWebcam.className = "p-2 rounded-lg bg-emerald-600/30 border border-emerald-500/40 text-white transition flex items-center justify-center space-x-1";
+    if (panelWebcam) panelWebcam.classList.remove('hidden');
+    if (modeLabel) modeLabel.textContent = "Active: Local Hardware Webcam (DirectShow)";
+    window.connectWebcamFeed(camId);
+    if (window.playAudioCue) window.playAudioCue('tab');
   } else if (mode === 'phone_live') {
     if (btnPhone) btnPhone.className = "p-2 rounded-lg bg-amber-600/30 border border-amber-500/40 text-white transition flex items-center justify-center space-x-1";
     if (panelPhone) panelPhone.classList.remove('hidden');
@@ -2591,6 +2608,152 @@ window.setCameraStreamMode = async function (camId, mode) {
     if (modeLabel) modeLabel.textContent = "Mode: Video File (.mp4)";
   }
 };
+
+window.connectWebcamFeed = async function (camId) {
+  const input = document.getElementById(`input-webcam-${camId}`);
+  const statusEl = document.getElementById(`status-webcam-${camId}`);
+  const modeLabel = document.getElementById(`current-mode-${camId.toLowerCase()}`);
+  const btnConnect = document.getElementById(`btn-connect-webcam-${camId}`);
+
+  let devId = input ? input.value.trim() : "0";
+  if (!devId) devId = "0";
+
+  if (btnConnect) {
+    btnConnect.disabled = true;
+    btnConnect.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i>Starting...`;
+  }
+  if (statusEl) {
+    statusEl.innerHTML = `<span class="text-emerald-400"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i>Initializing hardware webcam index ${devId}...</span>`;
+  }
+  if (modeLabel) modeLabel.textContent = `Connecting to Webcam (Device ${devId})...`;
+
+  try {
+    const res = await fetch(`/api/v1/cameras/${camId}/stream/configure`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'webcam', source_url: devId })
+    });
+    const data = await res.json();
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-check-circle mr-1"></i>Host Webcam connected (Dev ${devId})! Point camera at cars or steady number plates.</span>`;
+    }
+    if (modeLabel) modeLabel.textContent = `Active: Local Webcam (${data.status})`;
+    refreshStreamImage(camId);
+    if (window.playAudioCue) window.playAudioCue('action');
+  } catch (err) {
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-xmark mr-1"></i>Webcam error: ${err.message}</span>`;
+    }
+  } finally {
+    if (btnConnect) {
+      btnConnect.disabled = false;
+      btnConnect.innerHTML = `<i class="fa-solid fa-video mr-1"></i><span>Connect PC Cam</span>`;
+    }
+  }
+};
+
+window.toggleBrowserWebcamStream = async function (camId) {
+  window._browserStreams = window._browserStreams || {};
+  const lbl = document.getElementById(`label-browser-cam-${camId}`);
+  const statusEl = document.getElementById(`status-webcam-${camId}`);
+  const modeLabel = document.getElementById(`current-mode-${camId.toLowerCase()}`);
+
+  if (window._browserStreams[camId]) {
+    // Stop browser streaming
+    window._browserStreams[camId].stop();
+    delete window._browserStreams[camId];
+    if (lbl) lbl.textContent = "Browser Cam";
+    if (statusEl) statusEl.innerHTML = `<span class="text-gray-400">Browser camera stopped. Reverting to Host Webcam...</span>`;
+    window.connectWebcamFeed(camId);
+    return;
+  }
+
+  // Start browser streaming via getUserMedia
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert("Browser mediaDevices API not supported on this browser/insecure context.");
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { max: 30 } },
+      audio: false
+    });
+
+    const videoEl = document.createElement('video');
+    videoEl.srcObject = stream;
+    videoEl.autoplay = true;
+    videoEl.playsInline = true;
+    await videoEl.play();
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 960;
+    canvas.height = 540;
+    const ctx = canvas.getContext('2d');
+
+    if (lbl) lbl.textContent = "Stop Browser Cam";
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="text-cyan-400 font-bold"><i class="fa-solid fa-circle-dot text-rose-500 animate-ping mr-1"></i>STREAMING FROM BROWSER WEBCAM (Zero-Lag WebRTC Canvas)</span>`;
+    }
+    if (modeLabel) modeLabel.textContent = "Active: Browser WebRTC Stream";
+
+    let isStreaming = true;
+    const pushInterval = setInterval(async () => {
+      if (!isStreaming) return;
+      if (videoEl.readyState >= 2) {
+        ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(async (blob) => {
+          if (!blob || !isStreaming) return;
+          try {
+            const formData = new FormData();
+            formData.append('file', blob, 'frame.jpg');
+            await fetch(`/api/v1/cameras/${camId}/stream/frame_ingest`, {
+              method: 'POST',
+              body: formData
+            });
+          } catch (_) {}
+        }, 'image/jpeg', 0.70);
+      }
+    }, 60);
+
+    refreshStreamImage(camId);
+
+    window._browserStreams[camId] = {
+      stop: () => {
+        isStreaming = false;
+        clearInterval(pushInterval);
+        stream.getTracks().forEach(t => t.stop());
+        videoEl.pause();
+      }
+    };
+  } catch (err) {
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Browser camera permission denied: ${err.message}</span>`;
+    }
+  }
+};
+
+window.snapPlateFromWebcam = async function (camId = 'CAM_01') {
+  try {
+    const res = await fetch(`/api/v1/cameras/${camId}/stream/snapshot?t=${Date.now()}`);
+    if (!res.ok) {
+      alert("Camera snapshot not available yet. Please select Webcam or Phone mode first.");
+      return;
+    }
+    const blob = await res.blob();
+    const file = new File([blob], `steady_plate_snap_${Date.now()}.jpg`, { type: 'image/jpeg' });
+    window.handleOCRImageUpload({ target: { files: [file] } });
+
+    const previewBox = document.getElementById('ocr-image-preview-box');
+    if (previewBox) {
+      previewBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  } catch (err) {
+    console.error("Failed to snap from webcam:", err);
+    alert(`Failed to snap from webcam: ${err.message}`);
+  }
+};
+
 
 window.connectPhoneFeed = async function (camId) {
   const input = document.getElementById(`input-phone-${camId}`);

@@ -1217,6 +1217,10 @@
               <p class="text-[11px] text-gray-400 mt-0.5">Drag & drop any vehicle/plate photo or click Upload to run instant neural ANPR.</p>
             </div>
             <div class="flex items-center space-x-2 text-[11px]">
+              <button onclick="snapPlateFromWebcam()" class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-900 to-teal-800 hover:from-emerald-800 hover:to-teal-700 text-emerald-200 hover:text-white rounded-lg border border-emerald-500/50 font-semibold transition flex items-center space-x-1.5 shadow-sm">
+                <i class="fa-solid fa-camera"></i>
+                <span>Snap from Webcam</span>
+              </button>
               <label for="ocr-image-file" class="cursor-pointer px-3.5 py-1.5 bg-gradient-to-r from-cyan-900 to-cyan-800 hover:from-cyan-800 hover:to-cyan-700 text-cyan-200 hover:text-white rounded-lg border border-cyan-500/50 font-semibold transition flex items-center space-x-1.5 shadow-sm">
                 <i class="fa-solid fa-cloud-arrow-up"></i>
                 <span>Upload Plate Photo</span>
@@ -1497,10 +1501,14 @@
                 <span class="text-cyan-400 font-mono text-[10px]" id="current-mode-cam01">Active: Synthetic Highway</span>
               </div>
               
-              <div class="grid grid-cols-3 gap-1.5 text-xs font-semibold">
+              <div class="grid grid-cols-4 gap-1.5 text-xs font-semibold">
                 <button id="btn-mode-synth-CAM_01" onclick="setCameraStreamMode('CAM_01', 'synthetic')" class="p-2 rounded-lg bg-cyan-600/30 border border-cyan-500/40 text-white transition flex items-center justify-center space-x-1">
                   <i class="fa-solid fa-wand-magic-sparkles text-cyan-400"></i>
                   <span class="text-[11px]">Synthetic</span>
+                </button>
+                <button id="btn-mode-webcam-CAM_01" onclick="setCameraStreamMode('CAM_01', 'webcam')" class="p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center space-x-1">
+                  <i class="fa-solid fa-camera text-emerald-400"></i>
+                  <span class="text-[11px]">Webcam</span>
                 </button>
                 <button id="btn-mode-phone-CAM_01" onclick="setCameraStreamMode('CAM_01', 'phone_live')" class="p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center space-x-1">
                   <i class="fa-solid fa-mobile-screen text-amber-400"></i>
@@ -1508,8 +1516,40 @@
                 </button>
                 <button id="btn-mode-upload-CAM_01" onclick="setCameraStreamMode('CAM_01', 'video_file')" class="p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center space-x-1">
                   <i class="fa-solid fa-file-video text-purple-400"></i>
-                  <span class="text-[11px]">Upload MP4</span>
+                  <span class="text-[11px]">MP4 File</span>
                 </button>
+              </div>
+
+              <!-- Webcam Panel (Collapsible) -->
+              <div id="panel-webcam-CAM_01" class="hidden pt-1.5 space-y-2">
+                <div class="flex items-center justify-between">
+                  <label class="block text-[11px] font-mono text-emerald-300 font-semibold">Local Webcam / USB Camera:</label>
+                  <span class="text-[9px] text-emerald-400/80 font-mono">Real-Time Neural Detection &amp; ANPR</span>
+                </div>
+                <div class="flex space-x-1.5">
+                  <div class="relative flex-1">
+                    <span class="absolute inset-y-0 left-2 flex items-center text-[10px] text-gray-500 font-mono">Dev:</span>
+                    <input type="text" id="input-webcam-CAM_01" value="0" placeholder="0" class="w-full bg-slate-950 border border-emerald-500/40 rounded-lg pl-10 pr-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-emerald-400" />
+                  </div>
+                  <button id="btn-connect-webcam-CAM_01" onclick="connectWebcamFeed('CAM_01')" class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold rounded-lg text-xs transition flex items-center space-x-1.5 shrink-0 shadow-md">
+                    <i class="fa-solid fa-video"></i>
+                    <span>Connect PC Cam</span>
+                  </button>
+                  <button id="btn-browser-cam-CAM_01" onclick="toggleBrowserWebcamStream('CAM_01')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold rounded-lg text-xs transition flex items-center space-x-1 shrink-0 border border-cyan-500/40">
+                    <i class="fa-solid fa-globe"></i>
+                    <span id="label-browser-cam-CAM_01">Browser Cam</span>
+                  </button>
+                </div>
+                <!-- Inline Status Feedback Area -->
+                <div id="status-webcam-CAM_01" class="min-h-[18px] text-[11px] font-mono text-emerald-400"></div>
+                <div class="p-2 rounded bg-emerald-950/30 border border-emerald-500/30 text-[10px] text-emerald-200/90 space-y-1">
+                  <div class="font-bold flex items-center space-x-1 text-emerald-300">
+                    <i class="fa-solid fa-bullseye text-emerald-400"></i>
+                    <span>Vehicle &amp; Number Plate Detection:</span>
+                  </div>
+                  <p>• <b>Real Cars / Vehicles</b>: Deep learning SSDLite detector automatically tracks cars, buses, trucks, and bikes with speed &amp; color telemetry.</p>
+                  <p>• <b>Steady Number Plates</b>: Position any license plate in the central targeting reticle. The fast ANPR engine will automatically lock onto the plate characters within 0.2s.</p>
+                </div>
               </div>
 
               <!-- Phone IP Panel (Collapsible) -->
@@ -1610,10 +1650,14 @@
                 <span class="text-cyan-400 font-mono text-[10px]" id="current-mode-cam02">Active: Synthetic Highway</span>
               </div>
               
-              <div class="grid grid-cols-3 gap-1.5 text-xs font-semibold">
+              <div class="grid grid-cols-4 gap-1.5 text-xs font-semibold">
                 <button id="btn-mode-synth-CAM_02" onclick="setCameraStreamMode('CAM_02', 'synthetic')" class="p-2 rounded-lg bg-cyan-600/30 border border-cyan-500/40 text-white transition flex items-center justify-center space-x-1">
                   <i class="fa-solid fa-wand-magic-sparkles text-cyan-400"></i>
                   <span class="text-[11px]">Synthetic</span>
+                </button>
+                <button id="btn-mode-webcam-CAM_02" onclick="setCameraStreamMode('CAM_02', 'webcam')" class="p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center space-x-1">
+                  <i class="fa-solid fa-camera text-emerald-400"></i>
+                  <span class="text-[11px]">Webcam</span>
                 </button>
                 <button id="btn-mode-phone-CAM_02" onclick="setCameraStreamMode('CAM_02', 'phone_live')" class="p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center space-x-1">
                   <i class="fa-solid fa-mobile-screen text-amber-400"></i>
@@ -1621,8 +1665,40 @@
                 </button>
                 <button id="btn-mode-upload-CAM_02" onclick="setCameraStreamMode('CAM_02', 'video_file')" class="p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center space-x-1">
                   <i class="fa-solid fa-file-video text-purple-400"></i>
-                  <span class="text-[11px]">Upload MP4</span>
+                  <span class="text-[11px]">MP4 File</span>
                 </button>
+              </div>
+
+              <!-- Webcam Panel (Collapsible) -->
+              <div id="panel-webcam-CAM_02" class="hidden pt-1.5 space-y-2">
+                <div class="flex items-center justify-between">
+                  <label class="block text-[11px] font-mono text-emerald-300 font-semibold">Local Webcam / USB Camera:</label>
+                  <span class="text-[9px] text-emerald-400/80 font-mono">Real-Time Neural Detection &amp; ANPR</span>
+                </div>
+                <div class="flex space-x-1.5">
+                  <div class="relative flex-1">
+                    <span class="absolute inset-y-0 left-2 flex items-center text-[10px] text-gray-500 font-mono">Dev:</span>
+                    <input type="text" id="input-webcam-CAM_02" value="0" placeholder="0" class="w-full bg-slate-950 border border-emerald-500/40 rounded-lg pl-10 pr-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-emerald-400" />
+                  </div>
+                  <button id="btn-connect-webcam-CAM_02" onclick="connectWebcamFeed('CAM_02')" class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold rounded-lg text-xs transition flex items-center space-x-1.5 shrink-0 shadow-md">
+                    <i class="fa-solid fa-video"></i>
+                    <span>Connect PC Cam</span>
+                  </button>
+                  <button id="btn-browser-cam-CAM_02" onclick="toggleBrowserWebcamStream('CAM_02')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold rounded-lg text-xs transition flex items-center space-x-1 shrink-0 border border-cyan-500/40">
+                    <i class="fa-solid fa-globe"></i>
+                    <span id="label-browser-cam-CAM_02">Browser Cam</span>
+                  </button>
+                </div>
+                <!-- Inline Status Feedback Area -->
+                <div id="status-webcam-CAM_02" class="min-h-[18px] text-[11px] font-mono text-emerald-400"></div>
+                <div class="p-2 rounded bg-emerald-950/30 border border-emerald-500/30 text-[10px] text-emerald-200/90 space-y-1">
+                  <div class="font-bold flex items-center space-x-1 text-emerald-300">
+                    <i class="fa-solid fa-bullseye text-emerald-400"></i>
+                    <span>Vehicle &amp; Number Plate Detection:</span>
+                  </div>
+                  <p>• <b>Real Cars / Vehicles</b>: Deep learning SSDLite detector automatically tracks cars, buses, trucks, and bikes with speed &amp; color telemetry.</p>
+                  <p>• <b>Steady Number Plates</b>: Position any license plate in the central targeting reticle. The fast ANPR engine will automatically lock onto the plate characters within 0.2s.</p>
+                </div>
               </div>
 
               <!-- Phone IP Panel (Collapsible) -->

@@ -12,7 +12,7 @@ from app.services.video_ingestion_service import VideoIngestionService, STREAMS_
 from app.core.rate_limiter import limiter
 
 class StreamConfigRequest(BaseModel):
-    mode: str = "synthetic" # "phone_live", "video_file", "synthetic"
+    mode: str = "synthetic" # "webcam", "browser_stream", "phone_live", "video_file", "synthetic"
     source_url: Optional[str] = ""
 
 router = APIRouter(prefix="/cameras", tags=["Camera Feeds & ANPR Ingestion"])
@@ -159,12 +159,42 @@ def get_camera_snapshot(camera_id: str):
 def configure_stream(request: Request, camera_id: str, config: StreamConfigRequest):
     """
     Configures the video ingestion source for a camera:
+    - mode: 'webcam' (with optional source_url device index '0', '1')
+    - mode: 'browser_stream' (browser WebRTC / Canvas push frames)
     - mode: 'phone_live' (with source_url e.g. 'http://192.168.43.15:8080/video')
     - mode: 'video_file' (with source_url to local video path)
     - mode: 'synthetic'  (high-fidelity procedural fallback)
     """
     service = VideoIngestionService.get_instance()
     return service.configure_camera_stream(camera_id, mode=config.mode, source_url=config.source_url or "")
+
+@router.post("/{camera_id}/stream/frame_ingest", response_model=Dict[str, Any])
+@limiter.limit("600/minute")
+def ingest_browser_frame(request: Request, camera_id: str, file: UploadFile = File(...)):
+    """
+    Accepts raw JPEG/PNG frame bytes pushed directly from the browser's webcam.
+    Allows zero-latency client-side WebRTC / HTML5 Canvas camera streaming to the deep ANPR engine.
+    """
+    if not file:
+        raise HTTPException(status_code=400, detail="No frame file uploaded")
+    contents = file.file.read()
+    if not contents or len(contents) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded frame is empty")
+
+    service = VideoIngestionService.get_instance()
+    success = service.ingest_frame(camera_id, contents)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to decode image frame")
+
+    status = service.get_stream_status(camera_id)
+    return {
+        "camera_id": camera_id,
+        "status": status["status"],
+        "mode": status["mode"],
+        "fps": status["fps"],
+        "plates_detected": status["plates_detected"],
+        "latest_detections": status["latest_detections"]
+    }
 
 @router.post("/{camera_id}/stream/upload", response_model=Dict[str, Any])
 @limiter.limit("10/minute")
@@ -181,4 +211,5 @@ def upload_stream_video(request: Request, camera_id: str, file: UploadFile = Fil
 
     service = VideoIngestionService.get_instance()
     return service.configure_camera_stream(camera_id, mode="video_file", source_url=file_path)
+
 
