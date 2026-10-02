@@ -15,6 +15,17 @@ def list_cameras(request: Request):
     """Retrieve catalog of all traffic cameras and active stream states across the city network."""
     return camera_service.get_all_cameras()
 
+@router.get("/ocr_benchmark_matrix", response_model=Dict[str, Any])
+@limiter.limit("30/minute")
+def get_ocr_benchmark_matrix(request: Request, plate: Optional[str] = "WB02AK4921"):
+    """
+    Phase 2 STN-CRNN ANPR OCR Multi-Condition Benchmark Matrix:
+    Executes automated live evaluation across all 6 environmental degradation categories
+    (Clean, Rain, Night Glare, Motion Blur, 45° Oblique Angle Skew, Mud Grime)
+    and verifies whether all conditions pass the >=90% SLA threshold.
+    """
+    return anpr_service.run_full_ocr_benchmark_matrix(plate_text=plate)
+
 @router.get("/{camera_id}", response_model=Camera)
 @limiter.limit("60/minute")
 def get_camera(request: Request, camera_id: str):

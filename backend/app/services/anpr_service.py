@@ -8,12 +8,14 @@ from app.models.schemas import (
 from app.core.security import anonymize_plate
 
 MOCK_RAW_PLATES = [
-    {"plate": "7XYZ912", "class": "Sedan", "color": "Silver Metallic", "speed": 48.5},
-    {"plate": "3ABC456", "class": "SUV", "color": "Obsidian Black", "speed": 62.0},
-    {"plate": "9KLM882", "class": "Commercial Truck", "color": "White", "speed": 38.0},
-    {"plate": "5DEF123", "class": "Delivery Van", "color": "Dark Blue", "speed": 45.2},
-    {"plate": "8TRK991", "class": "Motorcycle", "color": "Matte Red", "speed": 54.0},
-    {"plate": "2BUS704", "class": "Transit Bus", "color": "Green / White", "speed": 34.5},
+    {"plate": "WB02AK4921", "class": "Sedan", "color": "Silver Metallic", "speed": 48.5},
+    {"plate": "22BH6517A", "class": "SUV", "color": "Obsidian Black", "speed": 62.0},
+    {"plate": "WB06J8812", "class": "Commercial Taxi", "color": "Classic Yellow", "speed": 38.0},
+    {"plate": "WB20E3304", "class": "Delivery Van", "color": "Dark Blue", "speed": 45.2},
+    {"plate": "WB12D9901", "class": "Commercial Truck", "color": "White", "speed": 42.0},
+    {"plate": "WB24B1008", "class": "Transit Bus", "color": "Blue / White", "speed": 34.5},
+    {"plate": "7XYZ912", "class": "Sedan", "color": "Silver Metallic", "speed": 52.0},
+    {"plate": "3ABC456", "class": "SUV", "color": "Obsidian Black", "speed": 58.5},
     {"plate": "KA01MJ5021", "class": "Luxury Sedan", "color": "Pearl White", "speed": 58.2},
     {"plate": "MH12PQ8899", "class": "Compact SUV", "color": "Graphite Grey", "speed": 41.0}
 ]
@@ -25,7 +27,8 @@ def generate_plate_svg(
     char_confs: Optional[List[CharacterConfidence]] = None
 ) -> str:
     """Generates an illustrative vector SVG representation of the license plate with character bounding boxes."""
-    bg_color = "#fef08a" if "KA" in plate_text or "MH" in plate_text else "#f8fafc"
+    is_commercial = "WB06" in plate_text or "BUS" in plate_text or "COMMERCIAL" in plate_text or "KA" in plate_text or "MH" in plate_text
+    bg_color = "#fef08a" if is_commercial else "#f8fafc"
     text_color = "#0f172a"
     clean_chars = [c for c in plate_text if c.isalnum()]
     if not clean_chars:
@@ -400,5 +403,67 @@ def process_uploaded_plate_image(image_bytes: bytes, filename: str = "upload.jpg
         all_detected_texts=all_texts,
         ocr_test_result=test_res
     )
+
+
+def run_full_ocr_benchmark_matrix(plate_text: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Executes a comprehensive Phase 2 benchmark across all 6 environmental degradation categories:
+    1. Clean Standard Daylight
+    2. Monsoon Rain & Water Droplets
+    3. Night Headlight Glare & Low-Lux
+    4. High-Speed Motion Blur (80+ km/h)
+    5. 45° Oblique Angle Skew (STN Homography)
+    6. Mud Grime & Soiled Plate
+    Returns structured results with pass/fail SLA status and aggregate system accuracy.
+    """
+    target_plate = (plate_text or "WB02AK4921").upper().strip()
+    degradations = [
+        {"id": "clean", "name": "Clean Standard Daylight", "target_sla": 90.0, "icon": "fa-sun"},
+        {"id": "rain", "name": "Monsoon Rain & Water Droplets", "target_sla": 90.0, "icon": "fa-cloud-rain"},
+        {"id": "glare", "name": "Night Headlight Glare", "target_sla": 90.0, "icon": "fa-bolt"},
+        {"id": "motion_blur", "name": "Highway Motion Blur (80 km/h)", "target_sla": 90.0, "icon": "fa-gauge-high"},
+        {"id": "oblique_angle", "name": "45° Oblique Angle (STN Homography)", "target_sla": 90.0, "icon": "fa-vector-square"},
+        {"id": "dirty", "name": "Mud Grime & Soiled Plate", "target_sla": 90.0, "icon": "fa-shield-halved"}
+    ]
+
+    results = []
+    total_acc = 0.0
+
+    for deg in degradations:
+        test_req = OCRTestRequest(
+            plate_text=target_plate,
+            degradation=deg["id"],
+            vehicle_speed_kmh=80 if deg["id"] == "motion_blur" else 50
+        )
+        test_res = test_ocr_degradation_pipeline(test_req)
+        acc = test_res.overall_accuracy_pct
+        total_acc += acc
+        results.append({
+            "degradation_id": deg["id"],
+            "degradation_name": deg["name"],
+            "icon": deg["icon"],
+            "accuracy_pct": acc,
+            "passes_sla": test_res.passes_90_pct_threshold,
+            "rectification_applied": test_res.rectification_applied,
+            "latency_ms": test_res.processing_time_ms,
+            "character_count": len(test_res.character_breakdown),
+            "sample_svg": test_res.ocr_visual_svg
+        })
+
+    avg_accuracy = round(total_acc / len(degradations), 2)
+    all_passed = all(r["passes_sla"] for r in results)
+
+    return {
+        "plate_text": target_plate,
+        "phase": "Phase 2 - STN-CRNN ANPR OCR",
+        "milestone_status": "CERTIFIED_PASS" if all_passed else "UNDER_REVIEW",
+        "average_accuracy_pct": avg_accuracy,
+        "minimum_sla_pct": 90.0,
+        "sla_met": all_passed,
+        "total_conditions_tested": len(degradations),
+        "conditions_passed": sum(1 for r in results if r["passes_sla"]),
+        "benchmark_matrix": results,
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 

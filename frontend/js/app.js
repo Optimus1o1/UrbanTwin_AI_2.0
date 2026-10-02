@@ -2337,7 +2337,8 @@ window.loadSamplePlateCrop = function (plate, degradation) {
   canvas.height = 90;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    ctx.fillStyle = plate.startsWith('KA') || plate.startsWith('MH') ? '#fef08a' : '#f8fafc';
+    const isCommercial = plate.startsWith('WB06') || plate.startsWith('KA') || plate.startsWith('MH') || plate.includes('BUS');
+    ctx.fillStyle = isCommercial ? '#fef08a' : '#f8fafc';
     ctx.fillRect(0, 0, 300, 90);
     ctx.strokeStyle = '#334155';
     ctx.lineWidth = 4;
@@ -2383,6 +2384,65 @@ window.loadSamplePlateCrop = function (plate, degradation) {
 
   runOCRTest();
 };
+
+window.runFullOCRBenchmark = async function () {
+  const btn = document.getElementById('ocr-benchmark-matrix-btn');
+  const plateInput = document.getElementById('ocr-plate-input');
+  const targetPlate = (plateInput && plateInput.value ? plateInput.value.trim() : 'WB02AK4921');
+
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add('opacity-75');
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i><span>Running 6-Condition SLA Benchmark...</span>`;
+  }
+
+  try {
+    const res = await fetch(`/api/v1/cameras/ocr_benchmark_matrix?plate=${encodeURIComponent(targetPlate)}`);
+    if (res.ok) {
+      const data = await res.json();
+      const results = data.benchmark_matrix || [];
+
+      results.forEach((item) => {
+        const id = item.degradation_id;
+        const valEl = document.getElementById(`val-deg-${id}`);
+        const rectEl = document.getElementById(`rect-deg-${id}`);
+        const badgeEl = document.getElementById(`badge-deg-${id}`);
+        const cardEl = document.getElementById(`card-deg-${id}`);
+
+        if (valEl) valEl.innerText = `${item.accuracy_pct.toFixed(1)}%`;
+        if (rectEl) rectEl.innerText = item.rectification_applied || 'STN Homography';
+
+        if (badgeEl) {
+          if (item.passes_sla) {
+            badgeEl.innerText = `>90% SLA PASS`;
+            badgeEl.className = 'px-2 py-0.5 bg-emerald-950/80 text-emerald-400 text-[9px] font-bold rounded border border-emerald-500/30 text-center uppercase tracking-wider';
+          } else {
+            badgeEl.innerText = `BELOW SLA`;
+            badgeEl.className = 'px-2 py-0.5 bg-amber-950/80 text-amber-400 text-[9px] font-bold rounded border border-amber-500/30 text-center uppercase tracking-wider';
+          }
+        }
+
+        if (cardEl) {
+          cardEl.classList.add('border-emerald-500/60');
+          setTimeout(() => {
+            cardEl.classList.remove('border-emerald-500/60');
+          }, 1500);
+        }
+      });
+
+      if (window.playAudioCue) window.playAudioCue('success');
+    }
+  } catch (err) {
+    console.error("Failed running full OCR benchmark:", err);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('opacity-75');
+      btn.innerHTML = `<i class="fa-solid fa-play"></i><span>Run Full 6-Condition SLA Benchmark</span>`;
+    }
+  }
+};
+
 
 // ==================== PROFESSIONAL DESIGNER AUDIO TELEMETRY & CONTROLS ====================
 
