@@ -64,12 +64,12 @@
 
   // Camera Nodes mapped to 3D Space Coordinates
   const CAMERA_NODES = [
-    { id: 'CAM_01', name: 'MG Road - Trinity Junction', sector: 'Commercial Core', x: -16, z: -10, flow: 580, speed: '42.5 km/h', status: 'optimal', density: 0.42 },
-    { id: 'CAM_02', name: 'Indiranagar 100ft Express', sector: 'East Transit', x: 0, z: -26, flow: 710, speed: '56.0 km/h', status: 'optimal', density: 0.38 },
-    { id: 'CAM_03', name: 'Koramangala Financial Core', sector: 'Tech Corridor', x: 18, z: -8, flow: 890, speed: '24.8 km/h', status: 'dense', density: 0.88 },
-    { id: 'CAM_04', name: 'West River Crossing Flyover', sector: 'West Gateway', x: -26, z: 14, flow: 460, speed: '62.4 km/h', status: 'optimal', density: 0.25 },
-    { id: 'CAM_05', name: 'Outer Ring Road - Bellandur', sector: 'South-East Corridor', x: 6, z: 22, flow: 620, speed: '38.0 km/h', status: 'moderate', density: 0.65 },
-    { id: 'CAM_06', name: 'Electronic City Tollway', sector: 'South Tech Corridor', x: 26, z: 18, flow: 510, speed: '48.6 km/h', status: 'optimal', density: 0.35 }
+    { id: 'CAM_01', name: 'Park Street - Chowringhee Crossing', sector: 'Commercial Core', x: -16, z: -10, flow: 580, speed: '42.5 km/h', status: 'optimal', density: 0.42 },
+    { id: 'CAM_02', name: 'EM Bypass - Science City Junction', sector: 'East Transit', x: 0, z: -26, flow: 710, speed: '56.0 km/h', status: 'optimal', density: 0.38 },
+    { id: 'CAM_03', name: 'Maa Flyover - Park Circus 7-Point', sector: 'Central Flyover Core', x: 18, z: -8, flow: 890, speed: '24.8 km/h', status: 'dense', density: 0.88 },
+    { id: 'CAM_04', name: 'Howrah Bridge - Strand Road Crossing', sector: 'River Gateway & Rail Transit', x: -26, z: 14, flow: 460, speed: '62.4 km/h', status: 'optimal', density: 0.25 },
+    { id: 'CAM_05', name: 'Salt Lake Sector V - College More', sector: 'IT & High-Tech Corridor', x: 6, z: 22, flow: 620, speed: '38.0 km/h', status: 'moderate', density: 0.65 },
+    { id: 'CAM_06', name: 'New Town Major Arterial - Biswa Bangla Gate', sector: 'Smart City North-East Hub', x: 26, z: 18, flow: 510, speed: '48.6 km/h', status: 'optimal', density: 0.35 }
   ];
 
   // Ground Multi-lane Road Network
@@ -1059,7 +1059,7 @@
       // 90-degree Top-down Satellite Overview
       setCameraFocus(0, 78, 2, 0, 0, 0);
     } else if (mode === 'junction') {
-      // Focus on high-throughput Trinity / Koramangala intersection
+      // Focus on high-throughput Park Street / Maa Flyover intersection
       setCameraFocus(16, 18, 14, 18, 0, -8);
     } else if (mode === 'corridor') {
       // Low-altitude Expressway chase perspective

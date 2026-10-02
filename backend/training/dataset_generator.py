@@ -270,11 +270,11 @@ def generate_traffic_telemetry_dataset(
     from datetime import datetime, timedelta
 
     corridors = [
-        {"road_id": "ROAD_01", "name": "MG Road Central Corridor", "speed_limit": 50.0, "base_flow": 800},
-        {"road_id": "ROAD_02", "name": "Outer Ring Road Express", "speed_limit": 80.0, "base_flow": 1400},
-        {"road_id": "ROAD_03", "name": "Indiranagar 100ft Arterial", "speed_limit": 45.0, "base_flow": 650},
-        {"road_id": "ROAD_04", "name": "Koramangala Tech Corridor", "speed_limit": 50.0, "base_flow": 900},
-        {"road_id": "ROAD_05", "name": "Electronic City Elevated Tollway", "speed_limit": 80.0, "base_flow": 1200}
+        {"road_id": "ROAD_01", "name": "Park Street Arterial", "speed_limit": 50.0, "base_flow": 800},
+        {"road_id": "ROAD_02", "name": "EM Bypass North-South Expressway", "speed_limit": 80.0, "base_flow": 1400},
+        {"road_id": "ROAD_03", "name": "Maa Flyover Elevated Corridor", "speed_limit": 55.0, "base_flow": 950},
+        {"road_id": "ROAD_04", "name": "Strand Road Viaduct", "speed_limit": 50.0, "base_flow": 700},
+        {"road_id": "ROAD_05", "name": "Biswa Bangla Expressway", "speed_limit": 80.0, "base_flow": 1200}
     ]
 
     start_time = datetime(2026, 1, 1, 0, 0, 0)

@@ -259,7 +259,7 @@ class SimulationScenario(BaseModel):
     name: str = "Custom Scenario"
     closed_roads: List[str] = []
     traffic_volume_change_pct: float = 0.0 # e.g. +20%
-    signal_timing_adjustments: Dict[str, float] = {} # e.g. {"Junction_Trinity": 10.0}
+    signal_timing_adjustments: Dict[str, float] = {} # e.g. {"Junction_ParkStreet": 10.0}
 
 class SimulationComparisonItem(BaseModel):
     metric_name: str

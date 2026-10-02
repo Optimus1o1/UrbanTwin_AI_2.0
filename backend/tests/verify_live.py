@@ -43,7 +43,7 @@ for ep, method in endpoints:
 sim_payload = json.dumps({
     "closed_roads": ["ROAD-A-B"],
     "traffic_volume_change_pct": 15.0,
-    "signal_timing_adjustments": {"Junction_Trinity": 45}
+    "signal_timing_adjustments": {"Junction_ParkStreet": 45}
 }).encode("utf-8")
 sim_req = urllib.request.Request(
     f"{base}/api/v1/simulation",

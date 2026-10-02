@@ -71,7 +71,7 @@ class BehavioralRadarService:
                     metric_name="Spatial-Temporal Velocity Anomaly",
                     observed_value="983.5 km/h apparent speed",
                     baseline_threshold="Max Physical Corridor Speed: 120.0 km/h",
-                    physical_discrepancy="Sighted at CAM_01 (Trinity) and CAM_06 (Electronic City, 22.4 km apart) within 82 seconds. Physical travel requires min. 24 minutes.",
+                    physical_discrepancy="Sighted at CAM_01 (Park Street) and CAM_06 (New Town Biswa Bangla Gate, 15.8 km apart) within 82 seconds. Physical travel requires min. 24 minutes.",
                     anomaly_z_score=5.4,
                     model_confidence=0.99,
                     details={
@@ -305,8 +305,8 @@ class BehavioralRadarService:
             )
 
         elif req.threat_type == BehavioralThreatType.TACTICAL_CONVOY:
-            plate_lead = req.primary_plate or f"KA03CV{random.randint(1000, 9999)}"
-            plate_trail = req.secondary_plate or f"KA03CV{random.randint(1000, 9999)}"
+            plate_lead = req.primary_plate or f"WB02CV{random.randint(1000, 9999)}"
+            plate_trail = req.secondary_plate or f"WB02CV{random.randint(1000, 9999)}"
             cams = ["CAM_03", "CAM_05", "CAM_06"]
             c_names = [CAMERA_COORDINATES[c]["name"] for c in cams]
 
@@ -330,7 +330,7 @@ class BehavioralRadarService:
                 ),
                 cameras_involved=cams,
                 camera_names=c_names,
-                sector="South Tech Corridor",
+                sector="New Town & Salt Lake IT Hub",
                 radar_angle_deg=round(random.uniform(40.0, 90.0), 1),
                 radar_distance_km=4.6,
                 route_coordinates=[[CAMERA_COORDINATES[c]["lat"], CAMERA_COORDINATES[c]["lng"]] for c in cams],
@@ -340,9 +340,9 @@ class BehavioralRadarService:
             )
 
         else: # SURVEILLANCE_LOITERING
-            plate = req.primary_plate or f"KA04LT{random.randint(1000, 9999)}"
+            plate = req.primary_plate or f"WB04LT{random.randint(1000, 9999)}"
             cams = ["CAM_04", "CAM_01", "CAM_04", "CAM_01"]
-            c_names = ["West River Crossing Flyover", "MG Road - Trinity Junction"]
+            c_names = ["Howrah Bridge - Strand Road Crossing", "Park Street - Chowringhee Crossing"]
 
             threat = PatternOfLifeThreat(
                 threat_id=f"THREAT-SIM-LOIT-{random.randint(100, 999)}",
@@ -355,20 +355,20 @@ class BehavioralRadarService:
                     metric_name="Trajectory Entropy & Recurrence",
                     observed_value="5 Complete Perimeter Loops in 40 min",
                     baseline_threshold="Permitted Dwell Loops in Zone: Max 1 Loop",
-                    physical_discrepancy=f"Repeated orbital surveillance passes surrounding West River Crossing and Government Zone with zero commercial dispatch records.",
+                    physical_discrepancy=f"Repeated orbital surveillance passes surrounding Howrah Bridge Strand Road and Park Street commercial zone with zero commercial dispatch records.",
                     anomaly_z_score=4.3,
                     model_confidence=0.93,
-                    details={"loops": 5, "duration_min": 40.0, "zone": "Government & Embassy Zone"}
+                    details={"loops": 5, "duration_min": 40.0, "zone": "High Court & Riverfront Commercial Corridor"}
                 ),
                 cameras_involved=cams,
                 camera_names=c_names,
-                sector="West Gateway & Embassy Zone",
+                sector="Riverfront & Commercial Corridor",
                 radar_angle_deg=round(random.uniform(200.0, 270.0), 1),
                 radar_distance_km=2.8,
                 route_coordinates=[[CAMERA_COORDINATES["CAM_04"]["lat"], CAMERA_COORDINATES["CAM_04"]["lng"]],
                                    [CAMERA_COORDINATES["CAM_01"]["lat"], CAMERA_COORDINATES["CAM_01"]["lng"]]],
                 detection_timestamp=ts,
-                suggested_action="Alert security detail at Government Flyover gate. Dispatch patrol unit for field check.",
+                suggested_action="Alert security detail at Howrah Bridge approach. Dispatch patrol unit for field check.",
                 status="ACTIVE_TRACKING"
             )
 

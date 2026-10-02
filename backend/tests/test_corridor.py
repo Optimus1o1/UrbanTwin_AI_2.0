@@ -33,10 +33,10 @@ def test_dispatch_custom_corridor():
     """Verify custom vehicle dispatch calculation."""
     payload = {
         "callsign": "AMB-TEST-77",
-        "plate_number": "KA-01-EQ-7777",
+        "plate_number": "WB-02-EQ-7777",
         "vehicle_type": "AMBULANCE",
         "incident_type": "Critical Cardiac Transport",
-        "origin_name": "Koramangala Station",
+        "origin_name": "SSKM Emergency Gate",
         "destination_name": "Apollo Super Specialty",
         "speed_kmh": 60.0
     }

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from app.models.schemas import (
     BlacklistEntry, BlacklistAlert, BlacklistSeverity, RouteAnomalyAlert
@@ -26,11 +26,11 @@ BLACKLIST_REGISTRY: List[BlacklistEntry] = [
         active=True
     ),
     BlacklistEntry(
-        plate_text="KA05X7711",
+        plate_text="WB05X7711",
         vehicle_desc="Commercial Delivery Truck",
         reason="Expired Interstate Transit Permit & Hazardous Cargo Non-Compliance",
         severity=BlacklistSeverity.MEDIUM,
-        registered_owner="Karnataka Logistics Cargo",
+        registered_owner="Kolkata Logistics Cargo",
         warrant_id="RTO-9902",
         flagged_date="2024-09-03",
         active=True
@@ -47,7 +47,7 @@ ACTIVE_ALERTS_DB: List[BlacklistAlert] = [
         reason="FIR #402/24: Stolen Luxury Vehicle / Wanted in Highway Cargo Theft",
         camera_id="CAM_03",
         camera_name="Maa Flyover - Park Circus 7-Point",
-        timestamp=datetime.utcnow().strftime("%H:%M:%S"),
+        timestamp=datetime.now(timezone.utc).strftime("%H:%M:%S"),
         latitude=22.5438,
         longitude=88.3683,
         x_3d=0.0,
@@ -68,7 +68,7 @@ ACTIVE_ALERTS_DB: List[BlacklistAlert] = [
         reason="Extreme Speed Violation & Multiple Tolling Evasions",
         camera_id="CAM_02",
         camera_name="EM Bypass - Science City Junction",
-        timestamp=datetime.utcnow().strftime("%H:%M:%S"),
+        timestamp=datetime.now(timezone.utc).strftime("%H:%M:%S"),
         latitude=22.5396,
         longitude=88.3965,
         x_3d=12.0,
@@ -89,7 +89,7 @@ ROUTE_ANOMALIES_DB: List[RouteAnomalyAlert] = [
         anomaly_type="GHOST_CLONED_PLATE",
         severity="CRITICAL",
         description="Impossible Spatial-Temporal Velocity: Plate sighted at CAM_01 (Park Street) and CAM_06 (Biswa Bangla Gate, 15 km apart) within 90 seconds. Physical travel requires min. 24 minutes. High confidence duplicate/cloned plate fraud.",
-        detection_timestamp=datetime.utcnow().strftime("%H:%M:%S"),
+        detection_timestamp=datetime.now(timezone.utc).strftime("%H:%M:%S"),
         cameras_involved=["CAM_01", "CAM_06"],
         confidence=0.98
     ),
@@ -99,7 +99,7 @@ ROUTE_ANOMALIES_DB: List[RouteAnomalyAlert] = [
         anomaly_type="CIRCUITOUS_LOITERING",
         severity="HIGH",
         description="Repetitive Circular Pattern: Vehicle performed 4 full loops around Park Street & Park Circus Corridor within 45 minutes without destination exit. Suspicious surveillance / loitering signature.",
-        detection_timestamp=datetime.utcnow().strftime("%H:%M:%S"),
+        detection_timestamp=datetime.now(timezone.utc).strftime("%H:%M:%S"),
         cameras_involved=["CAM_01", "CAM_03", "CAM_01", "CAM_03"],
         confidence=0.91
     )

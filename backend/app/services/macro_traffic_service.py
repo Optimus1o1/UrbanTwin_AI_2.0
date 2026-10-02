@@ -1,5 +1,5 @@
 import random
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any
 from app.models.schemas import (
     CityMacroOverview, TrafficDensity, LevelOfService, ODMatrix, ODPair, TrafficForecast
@@ -94,7 +94,7 @@ class MacroTrafficService:
             )
         ]
         return ODMatrix(
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             total_active_trips=sum(p.trips_per_hour for p in pairs),
             top_origin_destination_pairs=pairs,
             dominant_commuter_corridor="EM Bypass -> Salt Lake Sector V Tech Hub (480 trips/hr)"
@@ -134,7 +134,7 @@ class MacroTrafficService:
             online_cameras=sum(1 for c in CAMERAS_DB if c.status == "ONLINE"),
             total_plates_scanned_today=18450,
             current_city_avg_speed_kmh=avg_speed,
-            peak_congested_corridor="Koramangala Sony World Crossing (LOS D / 24.8 km/h)",
+            peak_congested_corridor="Maa Flyover - Park Circus 7-Point (LOS D / 24.8 km/h)",
             active_hotlist_alerts=2,
             system_ocr_accuracy_benchmark_pct=94.6,
             density_by_camera=densities,

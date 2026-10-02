@@ -94,7 +94,7 @@ def test_whatif_simulation():
     payload = {
         "closed_roads": ["ROAD-A-B"],
         "traffic_volume_change_pct": 20.0,
-        "signal_timing_adjustments": {"Junction_Trinity": 40}
+        "signal_timing_adjustments": {"Junction_ParkStreet": 40}
     }
     res = client.post("/api/v1/simulation", json=payload)
     assert res.status_code == 200

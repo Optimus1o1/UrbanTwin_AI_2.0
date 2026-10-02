@@ -308,11 +308,11 @@
     </div>
     <div class="overflow-hidden whitespace-nowrap flex-1">
       <div class="marquee-track space-x-8 text-gray-300">
-        <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-truck-medical mr-1"></i>[CORRIDOR] AMB-911 Cardiac Run: Indiranagar &rarr; Victoria Hospital (4 Signals Locked GREEN • 64.5 km/h)</span>
-        <span class="text-rose-400 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>[WARRANT SIGHTING] Plate 3ABC456 (Toyota Fortuner) Sighted at CAM_03 Koramangala Core • Intercept Window 210s at CAM_05</span>
+        <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-truck-medical mr-1"></i>[CORRIDOR] AMB-911 Cardiac Run: SSKM Hospital &rarr; Apollo Multispecialty (4 Signals Locked GREEN • 64.5 km/h)</span>
+        <span class="text-rose-400 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>[WARRANT SIGHTING] Plate 3ABC456 (Toyota Fortuner) Sighted at CAM_03 Maa Flyover • Intercept Window 210s at CAM_02</span>
         <span class="text-cyan-300"><i class="fa-solid fa-camera mr-1"></i>[ANPR STREAM] 6/6 Edge Cameras Synchronized • Deep OCR Precision Benchmark: 94.6% (>90% Spec)</span>
-        <span class="text-amber-300"><i class="fa-solid fa-chart-line mr-1"></i>[TRAFFIC DYNAMICS] Indiranagar 100ft Sector Inflow: 1,445 trips/hr • LOS B Free Flow Active</span>
-        <span class="text-purple-300"><i class="fa-solid fa-brain mr-1"></i>[RADAR] Behavioral Pattern-of-Life: 1 Tactical Convoy Tracked on Intermediate Ring Road</span>
+        <span class="text-amber-300"><i class="fa-solid fa-chart-line mr-1"></i>[TRAFFIC DYNAMICS] EM Bypass Expressway Inflow: 1,445 trips/hr • LOS B Free Flow Active</span>
+        <span class="text-purple-300"><i class="fa-solid fa-brain mr-1"></i>[RADAR] Behavioral Pattern-of-Life: 1 Tactical Convoy Tracked on EM Bypass / Maa Flyover</span>
       </div>
     </div>
   </div>
@@ -978,17 +978,17 @@
             <div>
               <label class="block font-mono text-gray-300 mb-1">Origin Node:</label>
               <select id="disp-origin" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:border-emerald-400 focus:outline-none">
-                <option value="Indiranagar 100ft Sector Inflow" selected>Indiranagar 100ft Crossing</option>
-                <option value="West River Fire HQ">West River Gateway</option>
-                <option value="Silk Board Interchange">Silk Board Transit Hub</option>
+                <option value="SSKM Hospital / IPGMER Emergency Bay" selected>SSKM Hospital Emergency Bay</option>
+                <option value="Howrah Riverfront Fire Station">Howrah Riverfront Fire Station</option>
+                <option value="Park Circus 7-Point Hub">Park Circus 7-Point Hub</option>
               </select>
             </div>
             <div>
               <label class="block font-mono text-gray-300 mb-1">Destination Facility:</label>
               <select id="disp-destination" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:border-emerald-400 focus:outline-none">
-                <option value="Victoria Emergency Trauma Hospital" selected>Victoria Emergency Trauma</option>
-                <option value="Trinity Super-Specialty Heart Institute">Trinity Heart Institute</option>
-                <option value="Koramangala Financial Tech Park">Koramangala Tech Park</option>
+                <option value="Apollo Multispecialty Hospital Apex Wing" selected>Apollo Multispecialty Trauma Center</option>
+                <option value="SSKM Hospital Trauma Center">SSKM Hospital Trauma Center</option>
+                <option value="Sector V IT & Financial Tech Hub">Sector V IT & Financial Tech Hub</option>
               </select>
             </div>
           </div>
@@ -1903,7 +1903,7 @@
             </div>
             <div class="text-sm font-bold text-white">Toyota Fortuner SUV (Black)</div>
             <p class="text-xs text-rose-200">Warrant #W-8891: Stolen Luxury Vehicle / Wanted in Highway Cargo Theft.</p>
-            <div class="text-[11px] text-gray-400 font-mono pt-1">Last Sighted: CAM_03 Koramangala Core • 64 km/h Southbound</div>
+            <div class="text-[11px] text-gray-400 font-mono pt-1">Last Sighted: CAM_03 Maa Flyover - Park Circus 7-Point • 64 km/h Eastbound</div>
           </div>
 
           <!-- Downstream Intercept Card -->
@@ -1912,10 +1912,10 @@
               <i class="fa-solid fa-crosshairs"></i>
               <span>PREDICTIVE INTERCEPT ADVISORY</span>
             </div>
-            <div class="text-slate-200">Recommended Intercept Node: <strong class="text-white">CAM_05 (Bellandur Tech Hub)</strong></div>
+            <div class="text-slate-200">Recommended Intercept Node: <strong class="text-white">CAM_02 (EM Bypass - Science City Junction)</strong></div>
             <div class="text-amber-400">Estimated Intercept Window: <strong class="text-white">210 Seconds (~3.5 min)</strong></div>
             <div class="text-slate-300 text-[11px] pt-1 border-t border-slate-800">
-              Suggested Action: Deploy patrol unit to Bellandur Tollway off-ramp. Set traffic signal to RED on approach.
+              Suggested Action: Deploy patrol unit to EM Bypass Science City off-ramp. Set traffic signal to RED on approach.
             </div>
           </div>
         </div>
@@ -2069,9 +2069,9 @@
             <label class="block font-mono text-gray-300 mb-1">Simulate Road Closures:</label>
             <select id="sim-closure-select" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
               <option value="none">None (Full Grid Open)</option>
-              <option value="ROAD-A-B" selected>MG Road - Trinity Corridor</option>
-              <option value="ROAD-C-D">Intermediate Ring Road Koramangala</option>
-              <option value="ROAD-E-F">Outer Ring Road Bellandur</option>
+              <option value="ROAD-A-B" selected>Park Street Arterial</option>
+              <option value="ROAD-C-D">Maa Flyover Elevated Corridor</option>
+              <option value="ROAD-E-F">Sector V Major Transit Way</option>
             </select>
           </div>
 

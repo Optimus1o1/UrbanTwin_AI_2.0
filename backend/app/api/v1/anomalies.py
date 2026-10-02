@@ -96,6 +96,6 @@ def get_intercept_advisory(request: Request, alert_id: str):
                 "recommended_intercept_node": a.predicted_intercept_camera_name,
                 "intercept_camera_id": a.predicted_intercept_camera_id,
                 "eta_seconds": a.intercept_eta_seconds,
-                "recommended_action": "Deploy patrol unit to Bellandur Tollway off-ramp. Set traffic signal to RED on approach."
+                "recommended_action": f"Deploy patrol unit to {a.predicted_intercept_camera_name} off-ramp. Set traffic signal to RED on approach."
             }
     raise HTTPException(status_code=404, detail=f"Alert '{alert_id}' not found")

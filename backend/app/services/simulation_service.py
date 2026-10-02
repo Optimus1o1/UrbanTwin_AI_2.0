@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models.schemas import SimulationScenario, SimulationResult, SimulationComparisonItem, RoadSimulationMetric
 from app.services.graph_service import ROAD_SEGMENTS_DB, LIVE_METRICS_DB
 
@@ -152,11 +152,11 @@ def run_whatif_simulation(scenario: SimulationScenario) -> SimulationResult:
     desc = " | ".join(desc_parts) if desc_parts else "Default Baseline Scenario"
 
     return SimulationResult(
-        scenario_id=f"SIM-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}",
+        scenario_id=f"SIM-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}",
         description=desc,
         metrics=items,
         affected_roads=affected,
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(timezone.utc).isoformat(),
         overall_congestion_before=base_congestion,
         overall_congestion_after=after_congestion,
         avg_speed_before_kmh=base_speed,

@@ -1,6 +1,6 @@
 import random
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from app.models.schemas import (
     PlateObservation, CharacterConfidence, OCRTestRequest, OCRTestResponse, OCRUploadResponse
@@ -121,10 +121,10 @@ def process_anpr_ocr(camera_id: str, vehicle_track_id: str) -> PlateObservation:
     avg_conf = round(total_conf / len(raw_plate), 3)
 
     return PlateObservation(
-        observation_id=f"OBS-{camera_id}-{datetime.utcnow().strftime('%H%M%S')}-{random.randint(10, 99)}",
+        observation_id=f"OBS-{camera_id}-{datetime.now(timezone.utc).strftime('%H%M%S')}-{random.randint(10, 99)}",
         camera_id=camera_id,
         camera_name=f"Camera Node {camera_id}",
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(timezone.utc).isoformat(),
         raw_plate_masked=masked_plate,
         plate_text=raw_plate,
         plate_hash=anonymized_hash,
@@ -463,7 +463,7 @@ def run_full_ocr_benchmark_matrix(plate_text: Optional[str] = None) -> Dict[str,
         "total_conditions_tested": len(degradations),
         "conditions_passed": sum(1 for r in results if r["passes_sla"]),
         "benchmark_matrix": results,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 

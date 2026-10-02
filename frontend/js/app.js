@@ -1802,34 +1802,34 @@ window.dispatchCorridorScenario = async function (presetKey) {
     'trauma_cardiac': {
       vehicle_id: 'VEH-EMG-01',
       callsign: 'AMB-911 (Cardiac Unit)',
-      plate_number: 'KA-01-EA-9911',
+      plate_number: 'WB-02-EA-9911',
       vehicle_type: 'AMBULANCE',
       priority_level: 'CODE_RED',
       incident_type: 'Severe STEMI Cardiac Arrest & Respiratory Distress',
-      origin_name: 'Indiranagar 100ft Sector Inflow',
-      destination_name: 'Victoria Emergency Trauma Hospital',
+      origin_name: 'SSKM Hospital / IPGMER Emergency Bay',
+      destination_name: 'Apollo Multispecialty Hospital Apex Wing',
       speed_kmh: 68.0
     },
     'fire_4alarm': {
       vehicle_id: 'VEH-EMG-02',
       callsign: 'FIRE-04 (Heavy Aerial Platform Engine)',
-      plate_number: 'KA-04-FE-101',
+      plate_number: 'WB-04-FE-101',
       vehicle_type: 'FIRE_ENGINE',
       priority_level: 'CODE_RED',
       incident_type: '4-Alarm Commercial Structure Fire',
-      origin_name: 'West River Fire HQ',
-      destination_name: 'Koramangala Financial Tech Park',
+      origin_name: 'Howrah Riverfront Fire Station',
+      destination_name: 'Sector V IT & Financial Tech Hub',
       speed_kmh: 62.0
     },
     'organ_transport': {
       vehicle_id: 'VEH-EMG-03',
       callsign: 'LIFE-01 (Rapid Organ Transport)',
-      plate_number: 'KA-05-OR-5500',
+      plate_number: 'WB-06-OR-5500',
       vehicle_type: 'ORGAN_TRANSPORT',
       priority_level: 'CODE_RED',
       incident_type: 'Zero-Delay Pediatric Donor Heart Transit',
-      origin_name: 'Silk Board Transit Hub',
-      destination_name: 'Trinity Super-Specialty Heart Institute',
+      origin_name: 'Park Circus 7-Point Hub',
+      destination_name: 'SSKM Hospital Trauma Center',
       speed_kmh: 74.0
     }
   };

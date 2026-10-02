@@ -1,14 +1,14 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models.schemas import RoadSegment, TrafficMetrics
 
 ROAD_SEGMENTS_DB: List[RoadSegment] = [
-    RoadSegment(road_id="ROAD-A-B", name="MG Road - Trinity Corridor", start_node="Junction_Trinity", end_node="Junction_Indiranagar", length_km=3.2, speed_limit_kmh=50.0),
-    RoadSegment(road_id="ROAD-B-C", name="100ft Road - Domlur Expressway", start_node="Junction_Indiranagar", end_node="Junction_Domlur", length_km=2.8, speed_limit_kmh=60.0),
-    RoadSegment(road_id="ROAD-C-D", name="Intermediate Ring Road - Koramangala", start_node="Junction_Domlur", end_node="Junction_Koramangala", length_km=4.1, speed_limit_kmh=55.0),
-    RoadSegment(road_id="ROAD-D-E", name="Hosur Main Road - Silk Board Interchange", start_node="Junction_Koramangala", end_node="Junction_SilkBoard", length_km=3.6, speed_limit_kmh=50.0),
-    RoadSegment(road_id="ROAD-E-F", name="Outer Ring Road - Bellandur Tech Corridor", start_node="Junction_SilkBoard", end_node="Junction_Bellandur", length_km=5.4, speed_limit_kmh=70.0),
-    RoadSegment(road_id="ROAD-F-A", name="Electronic City Elevated Tollway", start_node="Junction_Bellandur", end_node="Junction_Trinity", length_km=9.8, speed_limit_kmh=80.0)
+    RoadSegment(road_id="ROAD-A-B", name="Park Street Arterial", start_node="Junction_Trinity", end_node="Junction_Indiranagar", length_km=3.2, speed_limit_kmh=50.0),
+    RoadSegment(road_id="ROAD-B-C", name="EM Bypass North-South Expressway", start_node="Junction_Indiranagar", end_node="Junction_Domlur", length_km=2.8, speed_limit_kmh=60.0),
+    RoadSegment(road_id="ROAD-C-D", name="Maa Flyover Elevated Corridor", start_node="Junction_Domlur", end_node="Junction_Koramangala", length_km=4.1, speed_limit_kmh=55.0),
+    RoadSegment(road_id="ROAD-D-E", name="Strand Road Viaduct", start_node="Junction_Koramangala", end_node="Junction_SilkBoard", length_km=3.6, speed_limit_kmh=50.0),
+    RoadSegment(road_id="ROAD-E-F", name="Sector V Major Transit Way", start_node="Junction_SilkBoard", end_node="Junction_Bellandur", length_km=5.4, speed_limit_kmh=70.0),
+    RoadSegment(road_id="ROAD-F-A", name="Biswa Bangla Expressway", start_node="Junction_Bellandur", end_node="Junction_Trinity", length_km=9.8, speed_limit_kmh=80.0)
 ]
 
 # Baseline live metrics
@@ -30,7 +30,7 @@ def get_road_metrics(road_id: str) -> Optional[TrafficMetrics]:
     data = LIVE_METRICS_DB[road_id]
     return TrafficMetrics(
         road_id=road_id,
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(timezone.utc).isoformat(),
         vehicle_count=data["vehicle_count"],
         avg_speed_kmh=data["avg_speed_kmh"],
         density=data["density"],

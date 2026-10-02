@@ -40,21 +40,21 @@
 
   // Topology Definition
   const JUNCTIONS = {
-    "Junction_Trinity": { name: "Trinity Junction", x: -16, z: -10, label: "Trinity" },
-    "Junction_Indiranagar": { name: "Indiranagar 100ft", x: 0, z: -26, label: "Indiranagar" },
-    "Junction_Domlur": { name: "Domlur Flyover", x: 18, z: -8, label: "Domlur" },
-    "Junction_Koramangala": { name: "Koramangala Core", x: 8, z: 20, label: "Koramangala" },
-    "Junction_SilkBoard": { name: "Silk Board Interchange", x: -22, z: 16, label: "Silk Board" },
-    "Junction_Bellandur": { name: "Bellandur Tech Corridor", x: 24, z: 18, label: "Bellandur" }
+    "Junction_Trinity": { name: "Park Street - Chowringhee Crossing", x: -16, z: -10, label: "Park Street" },
+    "Junction_Indiranagar": { name: "EM Bypass - Science City Junction", x: 0, z: -26, label: "EM Bypass" },
+    "Junction_Domlur": { name: "Maa Flyover - Park Circus 7-Point", x: 18, z: -8, label: "Maa Flyover" },
+    "Junction_Koramangala": { name: "Howrah Bridge - Strand Road Crossing", x: 8, z: 20, label: "Howrah Strand" },
+    "Junction_SilkBoard": { name: "Salt Lake Sector V - College More", x: -22, z: 16, label: "Sector V" },
+    "Junction_Bellandur": { name: "New Town - Biswa Bangla Gate", x: 24, z: 18, label: "Biswa Bangla" }
   };
 
   const ROAD_DEFINITIONS = [
-    { id: "ROAD-A-B", name: "MG Road - Trinity Corridor", start: "Junction_Trinity", end: "Junction_Indiranagar", lanes: 4 },
-    { id: "ROAD-B-C", name: "100ft Road - Domlur Expressway", start: "Junction_Indiranagar", end: "Junction_Domlur", lanes: 4 },
-    { id: "ROAD-C-D", name: "Intermediate Ring Road - Koramangala", start: "Junction_Domlur", end: "Junction_Koramangala", lanes: 6 },
-    { id: "ROAD-D-E", name: "Hosur Main Road - Silk Board Interchange", start: "Junction_Koramangala", end: "Junction_SilkBoard", lanes: 6 },
-    { id: "ROAD-E-F", name: "Outer Ring Road - Bellandur Tech Corridor", start: "Junction_SilkBoard", end: "Junction_Bellandur", lanes: 6 },
-    { id: "ROAD-F-A", name: "Electronic City Elevated Tollway", start: "Junction_Bellandur", end: "Junction_Trinity", lanes: 4 }
+    { id: "ROAD-A-B", name: "Park Street Arterial", start: "Junction_Trinity", end: "Junction_Indiranagar", lanes: 4 },
+    { id: "ROAD-B-C", name: "EM Bypass North-South Expressway", start: "Junction_Indiranagar", end: "Junction_Domlur", lanes: 4 },
+    { id: "ROAD-C-D", name: "Maa Flyover Elevated Corridor", start: "Junction_Domlur", end: "Junction_Koramangala", lanes: 6 },
+    { id: "ROAD-D-E", name: "Strand Road Viaduct", start: "Junction_Koramangala", end: "Junction_SilkBoard", lanes: 6 },
+    { id: "ROAD-E-F", name: "Sector V Major Transit Way", start: "Junction_SilkBoard", end: "Junction_Bellandur", lanes: 6 },
+    { id: "ROAD-F-A", name: "Biswa Bangla Expressway", start: "Junction_Bellandur", end: "Junction_Trinity", lanes: 4 }
   ];
 
   let roadMeshes = {};

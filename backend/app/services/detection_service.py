@@ -1,5 +1,5 @@
 import random
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 from app.models.schemas import Detection
 
@@ -10,7 +10,7 @@ def generate_live_detections(camera_id: str, count: int = 6) -> List[Detection]:
     Simulates YOLO object detection inference output for a given camera feed frame.
     Generates realistic bounding boxes [x1, y1, x2, y2], confidence scores, vehicle classes, and speeds.
     """
-    random.seed(hash(camera_id) + int(datetime.utcnow().timestamp()) // 5)
+    random.seed(hash(camera_id) + int(datetime.now(timezone.utc).timestamp()) // 5)
     detections = []
     
     for i in range(count):
@@ -29,7 +29,7 @@ def generate_live_detections(camera_id: str, count: int = 6) -> List[Detection]:
         det = Detection(
             detection_id=f"DET-{camera_id}-{i+1:03d}",
             camera_id=camera_id,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             vehicle_class=v_class,
             bbox=[float(x1), float(y1), float(x1 + w), float(y1 + h)],
             confidence=confidence,
