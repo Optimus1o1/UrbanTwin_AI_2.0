@@ -1924,10 +1924,11 @@ HTML_CONTENT = r'''<!DOCTYPE html>
 
 def generate_pdf():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    html_file = os.path.join(script_dir, "UrbanTwin_AI_Proposal_Template.html")
+    project_root = os.path.dirname(script_dir)
+    html_file = os.path.join(project_root, "docs", "UrbanTwin_AI_Proposal_Template.html")
     
-    # Target 1: workspace root
-    pdf_file_ws = os.path.join(script_dir, "UrbanTwin_AI_Detailed_Project_Proposal.pdf")
+    # Target 1: frontend assets directory
+    pdf_file_ws = os.path.join(project_root, "frontend", "assets", "UrbanTwin_AI_Detailed_Project_Proposal.pdf")
     # Target 2: C:\Users\ANIKET\Downloads
     pdf_file_dl = r"C:\Users\ANIKET\Downloads\UrbanTwin_AI_Detailed_Project_Proposal.pdf"
 

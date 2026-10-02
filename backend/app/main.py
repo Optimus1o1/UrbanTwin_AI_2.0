@@ -69,12 +69,19 @@ async def add_security_headers_and_timing(request: Request, call_next):
     
     return response
 
-# Static files directory setup
-STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+# Frontend & Static files directory setup (resolves frontend/ or legacy backend/static/)
+FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
+LEGACY_STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+STATIC_DIR = FRONTEND_DIR if FRONTEND_DIR.exists() else LEGACY_STATIC_DIR
+
 INDEX_HTML = STATIC_DIR / "index.html"
 DASHBOARD_HTML = STATIC_DIR / "dashboard.html"
 PROPOSAL_HTML = STATIC_DIR / "proposal.html"
-PROPOSAL_PDF = STATIC_DIR / "UrbanTwin_AI_Detailed_Project_Proposal.pdf"
+PROPOSAL_PDF = (
+    STATIC_DIR / "assets" / "UrbanTwin_AI_Detailed_Project_Proposal.pdf"
+    if (STATIC_DIR / "assets" / "UrbanTwin_AI_Detailed_Project_Proposal.pdf").exists()
+    else STATIC_DIR / "UrbanTwin_AI_Detailed_Project_Proposal.pdf"
+)
 
 # Custom OpenAPI Schema with JWT Bearer Security & Curated Tags
 def custom_openapi():
@@ -223,9 +230,15 @@ app.include_router(anomalies.router, prefix=settings.API_V1_STR)
 app.include_router(simulation.router, prefix=settings.API_V1_STR)
 app.include_router(corridor.router, prefix=settings.API_V1_STR)
 
-# Mount Dashboard Static Web App
+# Mount Frontend Static Web App & Asset Routes
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+    # Direct mounts for client-side web paths
+    if (STATIC_DIR / "js").exists():
+        app.mount("/js", StaticFiles(directory=str(STATIC_DIR / "js")), name="js")
+    if (STATIC_DIR / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")
 
     @app.get("/dashboard", include_in_schema=False)
     @app.get("/ui", include_in_schema=False)
@@ -247,8 +260,9 @@ if STATIC_DIR.exists():
     def view_proposal_pdf():
         candidates = [
             PROPOSAL_PDF,
-            STATIC_DIR.parent.parent / "UrbanTwin_AI_Detailed_Project_Proposal.pdf",
-            Path(r"C:\Users\ANIKET\Downloads\UrbanTwin_AI_Detailed_Project_Proposal.pdf")
+            STATIC_DIR / "assets" / "UrbanTwin_AI_Detailed_Project_Proposal.pdf",
+            STATIC_DIR / "UrbanTwin_AI_Detailed_Project_Proposal.pdf",
+            STATIC_DIR.parent / "docs" / "UrbanTwin_AI_Detailed_Project_Proposal.pdf",
         ]
         for candidate in candidates:
             if candidate.exists():
@@ -266,8 +280,9 @@ if STATIC_DIR.exists():
     def download_proposal_pdf():
         candidates = [
             PROPOSAL_PDF,
-            STATIC_DIR.parent.parent / "UrbanTwin_AI_Detailed_Project_Proposal.pdf",
-            Path(r"C:\Users\ANIKET\Downloads\UrbanTwin_AI_Detailed_Project_Proposal.pdf")
+            STATIC_DIR / "assets" / "UrbanTwin_AI_Detailed_Project_Proposal.pdf",
+            STATIC_DIR / "UrbanTwin_AI_Detailed_Project_Proposal.pdf",
+            STATIC_DIR.parent / "docs" / "UrbanTwin_AI_Detailed_Project_Proposal.pdf",
         ]
         for candidate in candidates:
             if candidate.exists():

@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: urbantwin-ai
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ANPR_SALT
+        value: urbantwin_anpr_salt_privacy_protection_render_2026
+      - key: ENVIRONMENT
+        value: production

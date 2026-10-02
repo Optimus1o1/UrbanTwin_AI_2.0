@@ -33,54 +33,60 @@
 urbantwin-ai/
 ├── .github/
 │   └── workflows/
-│       └── ci.yml               # GitHub Actions CI automated testing workflow
+│       └── ci.yml               # GitHub Actions CI automated testing matrix
 ├── .vscode/
 │   ├── extensions.json          # Recommended VS Code extensions
 │   ├── launch.json              # 1-Click debug configurations (FastAPI, Pytest, Live test)
 │   ├── settings.json            # VS Code workspace settings & pytest integration
 │   └── tasks.json               # Predefined build, test, and docker tasks
-├── backend/
+├── frontend/                    # 🌐 Dedicated Frontend Application (aligned with 'frontend' branch)
+│   ├── index.html               # 3D interactive hero landing page
+│   ├── dashboard.html           # Centralized ANPR & Digital Twin Command Center UI
+│   ├── proposal.html            # Live interactive project blueprint
+│   ├── assets/                  # Static media, proposal PDF & brand assets
+│   └── js/                      # 3D WebGL canvases & client-side telemetry scripts
+│       ├── app.js               # UI state machine & REST API connectors
+│       ├── home-3d.js           # Three.js hero city canvas
+│       ├── twin-3d.js           # 3D Digital Twin corridor visualizer
+│       └── whatif-3d.js         # 3D scenario simulation canvas
+├── backend/                     # ⚙️ Dedicated Backend Service (aligned with 'backend' branch)
 │   ├── app/
 │   │   ├── api/v1/              # API router endpoints
 │   │   │   ├── anomalies.py     # Anomaly and incident detection
 │   │   │   ├── auth.py          # JWT authentication
-│   │   │   ├── cameras.py       # Camera feed ingestion & health
+│   │   │   ├── cameras.py       # Camera feed ingestion, OCR upload & health
+│   │   │   ├── corridor.py      # Arterial corridor matching, travel times & OD analytics
 │   │   │   ├── predictions.py   # ML traffic forecasting
 │   │   │   ├── roads.py         # Road segment telemetry & analytics
 │   │   │   ├── simulation.py    # Digital Twin simulation engine
 │   │   │   ├── traffic.py       # Live traffic snapshots & history
 │   │   │   └── vehicles.py      # Vehicle detection & re-identification
-│   │   ├── core/
-│   │   │   ├── config.py        # Pydantic Settings & environment variables
-│   │   │   ├── rate_limiter.py  # SlowAPI rate limiting configuration
-│   │   │   └── security.py      # Password hashing & JWT token handling
-│   │   ├── models/
-│   │   │   └── schemas.py       # Pydantic data schemas
-│   │   ├── services/            # Core business logic & ML services
-│   │   │   ├── anomaly_service.py
-│   │   │   ├── anpr_service.py
-│   │   │   ├── camera_service.py
-│   │   │   ├── detection_service.py
-│   │   │   ├── graph_service.py
-│   │   │   ├── matching_service.py
-│   │   │   ├── prediction_service.py
-│   │   │   └── simulation_service.py
-│   │   └── main.py              # FastAPI application entrypoint & middleware
-│   ├── static/                  # Built-in Web UI & Dashboard
-│   │   ├── index.html
-│   │   └── js/app.js
+│   │   ├── core/                # Configuration, rate limiting & security
+│   │   ├── models/              # Pydantic data schemas
+│   │   ├── services/            # Core business logic, ANPR & ML services
+│   │   └── main.py              # FastAPI application entrypoint & static mounts
+│   ├── models/                  # Pre-trained ML model checkpoints (.pth, .json)
 │   ├── tests/                   # Pytest test suite & verification scripts
-│   │   ├── test_api.py
-│   │   └── verify_live.py
-│   ├── Dockerfile               # Production hardened non-root containerfile
+│   ├── training/                # Deep Learning training studio, models & Colab notebook
+│   ├── Dockerfile               # Backend container definition
 │   ├── pytest.ini               # Pytest configuration
 │   └── requirements.txt         # Python dependencies
+├── deploy/                      # 🚢 Deployment Configurations
+│   ├── Dockerfile               # Production containerfile
+│   ├── docker-compose.yml       # Multi-container orchestration
+│   └── render.yaml              # Render cloud deployment blueprint
+├── docs/                        # 📚 Project Documentation & Training Manuals
+│   ├── UrbanTwin_AI_Detailed_Project_Proposal.md
+│   ├── COLAB_TRAINING_GUIDE.md
+│   └── UrbanTwin_AI_Proposal_Template.html
+├── scripts/                     # 🛠️ Operational & Export Utility Scripts
+│   └── generate_proposal_pdf.py
+├── .dockerignore                # Docker build ignore rules
 ├── .env.example                 # Environment variables template
 ├── .gitignore                   # Git ignore rules
-├── docker-compose.yml           # Multi-container orchestration
 ├── LICENSE                      # MIT License
 ├── README.md                    # Project documentation
-└── run.py                       # One-click startup script
+└── run.py                       # One-click startup script (http://localhost:8080)
 ```
 
 ---
