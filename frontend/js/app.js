@@ -2953,7 +2953,8 @@ window.loadStreamStatuses = async function () {
       const hudPlate = document.getElementById(`hud-${camIdLower}-plate`);
       if (hudPlate && s.latest_detections && s.latest_detections.length > 0) {
         const topDet = s.latest_detections[0];
-        hudPlate.textContent = `LATEST: ${topDet.plate_text} (${Math.round((topDet.confidence || 0.95)*100)}%)`;
+        const spdStr = (topDet.speed_kmh && topDet.speed_kmh > 0) ? `${topDet.speed_kmh.toFixed(1)} km/h` : 'STATIONARY';
+        hudPlate.textContent = `LATEST: ${topDet.plate_text} • ${spdStr} (${Math.round((topDet.confidence || 0.95)*100)}%)`;
         s.latest_detections.forEach(d => {
           detectionsAll.push({ ...d, camera_id: s.camera_id });
         });
@@ -2971,7 +2972,7 @@ window.loadStreamStatuses = async function () {
 
     if (detectionsAll.length > 0) {
       if (liveActiveCount) liveActiveCount.textContent = `${detectionsAll.length} Targets`;
-      const avgSpeed = (detectionsAll.reduce((acc, d) => acc + (d.speed_kmh || 45), 0) / detectionsAll.length).toFixed(1);
+      const avgSpeed = (detectionsAll.reduce((acc, d) => acc + (d.speed_kmh || 0), 0) / detectionsAll.length).toFixed(1);
       if (liveAvgSpeed) liveAvgSpeed.textContent = `${avgSpeed} km/h`;
       const avgConf = Math.round((detectionsAll.reduce((acc, d) => acc + (d.confidence || 0.95), 0) / detectionsAll.length) * 100);
       if (liveAvgConf) liveAvgConf.textContent = `${avgConf}%`;
@@ -2999,8 +3000,9 @@ function renderStreamDetectionsTable(detections) {
   const timeStr = now.toTimeString().split(' ')[0];
 
   const rowsHtml = detections.slice(0, 10).map(d => {
-    const speedVal = d.speed_kmh || 45;
-    const speedColor = speedVal > 60 ? 'text-rose-400 font-bold' : (speedVal > 45 ? 'text-amber-400 font-semibold' : 'text-emerald-400 font-semibold');
+    const speedVal = d.speed_kmh || 0.0;
+    const speedColor = speedVal > 55 ? 'text-rose-400 font-bold' : (speedVal > 25 ? 'text-emerald-400 font-semibold' : (speedVal > 0 ? 'text-cyan-400 font-semibold' : 'text-amber-400 font-normal'));
+    const speedLabel = speedVal > 0 ? `${speedVal.toFixed(1)} km/h` : '0.0 km/h (Stationary)';
     const colorHex = d.color_hex || '#cbd5e1';
     const colorName = d.vehicle_color || 'Silver Metallic';
     const laneStr = d.lane || 'Lane 2 (Express Center)';
@@ -3022,7 +3024,7 @@ function renderStreamDetectionsTable(detections) {
           <span class="text-slate-300 text-[11px] truncate max-w-[120px]">${colorName}</span>
         </div>
       </td>
-      <td class="py-2.5 px-3 font-mono ${speedColor}">${speedVal.toFixed(1)} km/h</td>
+      <td class="py-2.5 px-3 font-mono ${speedColor}">${speedLabel}</td>
       <td class="py-2.5 px-3">
         <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-cyan-300 text-[10px] whitespace-nowrap">${laneStr}</span>
       </td>
@@ -3042,12 +3044,19 @@ function renderStreamDetectionsTable(detections) {
   tbody.innerHTML = rowsHtml;
 }
 
-// Auto-poll stream status every 2.5 seconds
+// Auto-poll stream status every 1.5 seconds whenever streams are active or tab is opened
 if (!streamPollingTimer) {
   streamPollingTimer = setInterval(() => {
-    if (typeof currentTab !== 'undefined' && currentTab === 'streams') {
+    const streamsTab = document.getElementById('tab-streams');
+    const isVisible = streamsTab && !streamsTab.classList.contains('hidden');
+    if (isVisible || (typeof currentTab !== 'undefined' && currentTab === 'streams')) {
       window.loadStreamStatuses();
     }
-  }, 2500);
+  }, 1500);
 }
+
+// Initial status load
+setTimeout(() => {
+  if (window.loadStreamStatuses) window.loadStreamStatuses();
+}, 600);
 

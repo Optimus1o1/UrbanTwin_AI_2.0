@@ -402,23 +402,24 @@ class LiveVehicleRecognitionEngine:
         if self.prev_gray is not None and self.prev_gray.shape == curr_gray.shape:
             try:
                 roi_gray = curr_gray[by:by + bh, bx:bx + bw]
-                corners = cv2.goodFeaturesToTrack(roi_gray, maxCorners=12, qualityLevel=0.04, minDistance=6)
+                corners = cv2.goodFeaturesToTrack(roi_gray, maxCorners=16, qualityLevel=0.03, minDistance=5)
                 if corners is not None and len(corners) > 0:
                     curr_pts = corners + np.array([bx, by], dtype=np.float32)
                     prev_pts, status, _ = cv2.calcOpticalFlowPyrLK(
-                        curr_gray,
                         self.prev_gray,
+                        curr_gray,
                         curr_pts,
                         None,
-                        winSize=(15, 15),
+                        winSize=(21, 21),
                         maxLevel=2
                     )
-                    good_curr = curr_pts[status == 1]
-                    good_prev = prev_pts[status == 1]
-                    if len(good_curr) >= 2:
+                    stat_mask = (status.ravel() == 1)
+                    if np.sum(stat_mask) >= 2:
+                        good_curr = curr_pts[stat_mask].reshape(-1, 2)
+                        good_prev = prev_pts[stat_mask].reshape(-1, 2)
                         dxs = good_curr[:, 0] - good_prev[:, 0]
                         dys = good_curr[:, 1] - good_prev[:, 1]
-                        flow_disp = float(math.hypot(np.median(dxs), np.median(dys)))
+                        flow_disp = float(math.hypot(float(np.median(dxs)), float(np.median(dys))))
             except Exception:
                 flow_disp = 0.0
 
@@ -429,23 +430,22 @@ class LiveVehicleRecognitionEngine:
 
         effective_disp = max(flow_disp, c_disp)
 
-        if effective_disp < 1.2:
+        if effective_disp < 0.35:
             inst_speed = 0.0
         else:
-            inst_speed = min(92.0, (effective_disp / dt) * 0.072)
+            # Calibrated for 960x540 arterial camera view: ~150-250 px/s corresponds to 35-55 km/h
+            inst_speed = min(98.0, (effective_disp / max(0.015, dt)) * 0.22)
 
         if matched_id in self.tracks:
             prev_speed = self.tracks[matched_id]["speed"]
             if inst_speed == 0.0:
-                speed = round(prev_speed * 0.35, 1)
-                if speed < 1.8:
+                speed = round(prev_speed * 0.40, 1)
+                if speed < 1.0:
                     speed = 0.0
             else:
-                speed = round(prev_speed * 0.65 + inst_speed * 0.35, 1)
+                speed = round(prev_speed * 0.30 + inst_speed * 0.70, 1)
         else:
             speed = round(inst_speed, 1)
-            if speed < 2.0:
-                speed = 0.0
 
         return speed
 
@@ -534,7 +534,7 @@ class LiveVehicleRecognitionEngine:
             if matched_id in self.cached_plates:
                 plate, conf = self.cached_plates[matched_id]
                 ocr_locked = True
-            elif (now - self.last_recognized_time < 5.0) and self.last_recognized_plate:
+            elif (now - self.last_recognized_time < 30.0) and self.last_recognized_plate:
                 plate = self.last_recognized_plate
                 conf = self.last_recognized_conf
                 ocr_locked = True
@@ -549,9 +549,14 @@ class LiveVehicleRecognitionEngine:
                     conf = fallback_c
                     ocr_locked = False
 
-                if crop_to_submit is None and crop.size > 0:
+            # Prioritize bumper crop where license plates reside
+            if crop_to_submit is None and crop.size > 0:
+                if bh > 75:
+                    bumper_y1 = max(0, int(bh * 0.48))
+                    crop_to_submit = crop[bumper_y1:bh, :].copy()
+                else:
                     crop_to_submit = crop.copy()
-                    crop_track_id = matched_id
+                crop_track_id = matched_id
 
             self.tracks[matched_id] = {
                 "centroid": (cx, cy),
@@ -583,16 +588,18 @@ class LiveVehicleRecognitionEngine:
             self._draw_center_reticle(frame)
 
         # 4. Dispatch next OCR inference job if worker is idle
-        if self.pending_ocr_future is None and (now - self.last_ocr_submission_time >= 0.15):
-            if crop_to_submit is not None:
+        if self.pending_ocr_future is None and (now - self.last_ocr_submission_time >= 0.20):
+            # Center reticle zone (320x140) where user targets plates
+            center_crop = frame[max(0, h // 2 - 70):min(h, h // 2 + 70), max(0, w // 2 - 160):min(w, w // 2 + 160)]
+            if self.frame_index % 2 == 0 and center_crop.size > 0:
+                self.pending_ocr_future = self.ocr_executor.submit(_ocr_worker_task, center_crop.copy(), 999)
+                self.last_ocr_submission_time = now
+            elif crop_to_submit is not None and crop_to_submit.size > 0:
                 self.pending_ocr_future = self.ocr_executor.submit(_ocr_worker_task, crop_to_submit, crop_track_id or 101)
                 self.last_ocr_submission_time = now
-            else:
-                # Central Viewfinder Inspection Zone
-                center_crop = frame[max(0, h // 2 - 100):min(h, h // 2 + 100), max(0, w // 2 - 180):min(w, w // 2 + 180)]
-                if center_crop.size > 0:
-                    self.pending_ocr_future = self.ocr_executor.submit(_ocr_worker_task, center_crop.copy(), 999)
-                    self.last_ocr_submission_time = now
+            elif center_crop.size > 0:
+                self.pending_ocr_future = self.ocr_executor.submit(_ocr_worker_task, center_crop.copy(), 999)
+                self.last_ocr_submission_time = now
 
         # Update previous frame for optical flow
         self.prev_gray = gray.copy()
@@ -641,7 +648,7 @@ class LiveVehicleRecognitionEngine:
         rx1, ry1 = cx - rw, cy - rh
         rx2, ry2 = cx + rw, cy + rh
         now = time.time()
-        is_locked = bool(self.last_recognized_plate and (now - self.last_recognized_time < 5.0))
+        is_locked = bool(self.last_recognized_plate and (now - self.last_recognized_time < 30.0))
         reticle_color = (0, 255, 180) if is_locked else (0, 215, 255)
         corner_len = 24
 

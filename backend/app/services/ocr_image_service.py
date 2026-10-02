@@ -347,21 +347,18 @@ def localize_plate_candidates(img_rgb: np.ndarray) -> List[Tuple[np.ndarray, Tup
     total_area = h * w
     candidates: List[Tuple[np.ndarray, Tuple[int, int, int, int], str]] = []
 
-    # 1. Primary Priority: Full image (essential for pre-cropped plates and steady plate targeting)
-    candidates.append((img_rgb, (0, 0, w, h), 'full_image'))
+    aspect_ratio = w / float(max(1, h))
+    is_pre_cropped = (1.4 <= aspect_ratio <= 7.5) and (h <= 240) and (w <= 640)
 
-    # 2. Central Viewfinder zone (for camera feeds or vehicles positioned in center of frame)
-    if h >= 180 and w >= 220:
-        cy1, cy2 = int(0.20 * h), int(0.85 * h)
-        cx1, cx2 = int(0.12 * w), int(0.88 * w)
-        center_crop = img_rgb[cy1:cy2, cx1:cx2]
-        if center_crop.size > 0:
-            candidates.append((center_crop, (cx1, cy1, cx2 - cx1, cy2 - cy1), 'center_viewfinder'))
+    # Fast-Path: If input image is already an isolated plate crop (e.g. 70x240, 50x180), evaluate directly
+    if is_pre_cropped:
+        candidates.append((img_rgb, (0, 0, w, h), 'direct_plate_crop'))
+        return candidates
 
     gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
     contour_candidates: List[Tuple[float, Tuple[np.ndarray, Tuple[int, int, int, int], str]]] = []
 
-    # 3. Edge & Contour Morphology (Sobel-X)
+    # 1. Edge & Contour Morphology (Sobel-X) - Localizes plate text characters & border
     try:
         clahe = cv2.createCLAHE(clipLimit=2.2, tileGridSize=(8, 8))
         enhanced = clahe.apply(gray)
@@ -386,13 +383,12 @@ def localize_plate_candidates(img_rgb: np.ndarray) -> List[Tuple[np.ndarray, Tup
                     y2 = min(h, y + ch + my)
                     crop = img_rgb[y1:y2, x1:x2]
                     if crop.size > 0 and crop.shape[0] >= 10 and crop.shape[1] >= 20:
-                        # Rank by proximity to ideal plate aspect ratio (3.5)
                         diff = abs(aspect - 3.5)
                         contour_candidates.append((diff, (crop, (x1, y1, x2 - x1, y2 - y1), 'contour_sobel')))
-    except Exception as e:
+    except Exception:
         pass
 
-    # 4. Color & Contrast Segmentation (White & Yellow plates)
+    # 2. Color & Contrast Segmentation (White & Yellow plates)
     try:
         hsv = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2HSV)
         white_mask = cv2.inRange(hsv, np.array([0, 0, 130]), np.array([180, 60, 255]))
@@ -418,13 +414,32 @@ def localize_plate_candidates(img_rgb: np.ndarray) -> List[Tuple[np.ndarray, Tup
                     if crop.size > 0:
                         diff = abs(aspect - 3.5)
                         contour_candidates.append((diff, (crop, (x1, y1, x2 - x1, y2 - y1), 'color_segmentation')))
-    except Exception as e:
+    except Exception:
         pass
 
-    # Pick top 2 most promising contour crops
+    # Prioritize top 3 most promising tight plate contour crops
     contour_candidates.sort(key=lambda item: item[0])
-    for _, cand_tuple in contour_candidates[:2]:
+    for _, cand_tuple in contour_candidates[:3]:
         candidates.append(cand_tuple)
+
+    # 3. Vehicle Geometric Prior: Lower Bumper Region (where plates are mounted)
+    if h >= 140 and w >= 180:
+        by1, by2 = int(0.48 * h), h
+        bx1, bx2 = int(0.06 * w), int(0.94 * w)
+        bumper_crop = img_rgb[by1:by2, bx1:bx2]
+        if bumper_crop.size > 0:
+            candidates.append((bumper_crop, (bx1, by1, bx2 - bx1, by2 - by1), 'vehicle_bumper'))
+
+    # 4. Central Viewfinder Reticle (where user aims camera / phone)
+    if h >= 160 and w >= 200:
+        cy1, cy2 = int(0.30 * h), int(0.70 * h)
+        cx1, cx2 = int(0.20 * w), int(0.80 * w)
+        center_crop = img_rgb[cy1:cy2, cx1:cx2]
+        if center_crop.size > 0:
+            candidates.append((center_crop, (cx1, cy1, cx2 - cx1, cy2 - cy1), 'center_viewfinder'))
+
+    # 5. Last Resort Full Image Fallback
+    candidates.append((img_rgb, (0, 0, w, h), 'full_image_fallback'))
 
     return candidates
 
@@ -689,22 +704,22 @@ def recognize_plate_from_array(
                                         'bbox': bbox
                                     })
 
-                    # FAST-PATH EARLY EXIT: If confident plate found (score >= 2.2 and len >= 6, or len >= 4 with conf >= 0.70), stop immediately!
+                    # FAST-PATH EARLY EXIT: If confident plate found (score >= 1.5 and len >= 4), stop immediately!
                     top_matches = [
                         c for c in scored_candidates
-                        if (c['score'] >= 2.2 and len(c['plate']) >= 6) or (len(c['plate']) >= 4 and c['conf'] >= 0.70)
+                        if (c['score'] >= 1.5 and len(c['plate']) >= 4)
                     ]
                     if top_matches:
                         break
 
-                except Exception as ocr_err:
-                    print(f"[OCRImageService] Candidate {cand_idx} pass {var_idx} note: {ocr_err}")
+                except Exception:
+                    pass
 
-            if any((c['score'] >= 2.2 and len(c['plate']) >= 6) or (len(c['plate']) >= 4 and c['conf'] >= 0.70) for c in scored_candidates):
+            if any(c['score'] >= 1.5 and len(c['plate']) >= 4 for c in scored_candidates):
                 break
 
-            # Limit total candidate crops evaluated to at most 3
-            if cand_idx >= 2:
+            # Limit total candidate crops evaluated to at most 4
+            if cand_idx >= 3:
                 break
 
         # Select best candidate
