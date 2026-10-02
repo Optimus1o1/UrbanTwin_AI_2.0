@@ -200,39 +200,44 @@ async function loadInitialDashboardData() {
   }
 }
 
-// LEAFLET MAPS INITIALIZATION
+// LEAFLET MAPS INITIALIZATION (Watermark-free, 100% free OSM with Cyber-Dark styling)
 function initLeafletMaps() {
   if (typeof L === 'undefined') return;
 
   const bangaloreCenter = [12.9450, 77.6250];
+  const osmUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const osmAttr = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" class="text-cyan-400">OpenStreetMap</a> contributors';
 
   // 1. Macro City Map
   const cityEl = document.getElementById('city-map');
   if (cityEl) {
+    cityEl.classList.add('dark-map-tiles');
     cityMap = L.map('city-map', { zoomControl: true }).setView(bangaloreCenter, 12);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer(osmUrl, {
       maxZoom: 19,
-      attribution: '&copy; CARTO &copy; OpenStreetMap'
+      attribution: osmAttr
     }).addTo(cityMap);
   }
 
   // 2. Trajectory Map
   const trajEl = document.getElementById('trajectory-map');
   if (trajEl) {
+    trajEl.classList.add('dark-map-tiles');
     trajectoryMap = L.map('trajectory-map', { zoomControl: true }).setView(bangaloreCenter, 12);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer(osmUrl, {
       maxZoom: 19,
-      attribution: '&copy; CARTO &copy; OpenStreetMap'
+      attribution: osmAttr
     }).addTo(trajectoryMap);
   }
 
   // 3. Green Corridor Map
   const corrEl = document.getElementById('corridor-map');
   if (corrEl && !corridorMap) {
+    corrEl.classList.add('dark-map-tiles');
     corridorMap = L.map('corridor-map', { zoomControl: true }).setView(bangaloreCenter, 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer(osmUrl, {
       maxZoom: 19,
-      attribution: '&copy; CARTO &copy; OpenStreetMap'
+      attribution: osmAttr
     }).addTo(corridorMap);
   }
 }

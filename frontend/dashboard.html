@@ -125,7 +125,17 @@
       width: 100%;
       border-radius: 0.75rem;
       z-index: 10;
+      background: #070d1e;
     }
+
+    /* Cyber-Dark Leaflet Map Tiles (100% Free, Zero Watermark OSM) */
+    .dark-map-tiles .leaflet-tile-pane {
+      filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.25) brightness(0.7);
+    }
+    .dark-map-tiles .leaflet-container {
+      background: #070d1e !important;
+    }
+
 
     .custom-leaflet-popup .leaflet-popup-content-wrapper {
       background: #070d1e;
@@ -1655,8 +1665,8 @@
   </nav>
 
   <!-- Script Libraries with Cache Busting -->
-  <script src="/static/js/twin-3d.js?v=2.1"></script>
-  <script src="/static/js/whatif-3d.js?v=2.1"></script>
-  <script src="/static/js/app.js?v=2.1"></script>
+  <script src="/static/js/twin-3d.js?v=2.2"></script>
+  <script src="/static/js/whatif-3d.js?v=2.2"></script>
+  <script src="/static/js/app.js?v=2.2"></script>
 </body>
 </html>
