@@ -6,11 +6,11 @@ This guide walks you through training and exporting your **personalized AI model
 
 ## 📁 What's Included
 
-* **Google Colab Notebook**: [`UrbanTwin_AI_Personalized_Model_Colab.ipynb`](file:///c:/Users/ANIKET/Downloads/urbantwin-ai-main/urbantwin-ai-main/UrbanTwin_AI_Personalized_Model_Colab.ipynb)
-* **Synthetic Demo Dataset Generator**: [`backend/training/dataset_generator.py`](file:///c:/Users/ANIKET/Downloads/urbantwin-ai-main/urbantwin-ai-main/backend/training/dataset_generator.py)
-* **Personalized Deep Learning Architecture**: [`backend/training/model_architecture.py`](file:///c:/Users/ANIKET/Downloads/urbantwin-ai-main/urbantwin-ai-main/backend/training/model_architecture.py)
-* **CLI Training Script**: [`backend/training/train.py`](file:///c:/Users/ANIKET/Downloads/urbantwin-ai-main/urbantwin-ai-main/backend/training/train.py)
-* **Inference Engine**: [`backend/training/inference.py`](file:///c:/Users/ANIKET/Downloads/urbantwin-ai-main/urbantwin-ai-main/backend/training/inference.py)
+* **Google Colab Notebook**: [`backend/training/UrbanTwin_AI_Personalized_Model_Colab.ipynb`](backend/training/UrbanTwin_AI_Personalized_Model_Colab.ipynb)
+* **Synthetic Demo Dataset Generator**: [`backend/training/dataset_generator.py`](backend/training/dataset_generator.py)
+* **Personalized Deep Learning Architecture**: [`backend/training/model_architecture.py`](backend/training/model_architecture.py)
+* **CLI Training Script**: [`backend/training/train.py`](backend/training/train.py)
+* **Inference Engine**: [`backend/training/inference.py`](backend/training/inference.py)
 
 ---
 
@@ -19,7 +19,7 @@ This guide walks you through training and exporting your **personalized AI model
 ### Step 1: Open the Notebook in Google Colab
 1. Navigate to [Google Colab](https://colab.research.google.com).
 2. Click **File** > **Upload Notebook**.
-3. Select `UrbanTwin_AI_Personalized_Model_Colab.ipynb` from your computer (located in your project root or `backend/training/`).
+3. Select `backend/training/UrbanTwin_AI_Personalized_Model_Colab.ipynb` from your repository.
 
 ### Step 2: Enable Free GPU Acceleration
 1. In Google Colab, go to **Runtime** > **Change runtime type**.
