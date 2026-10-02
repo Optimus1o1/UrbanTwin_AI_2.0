@@ -2588,14 +2588,41 @@ window.setCameraStreamMode = async function (camId, mode) {
 
 window.connectPhoneFeed = async function (camId) {
   const input = document.getElementById(`input-phone-${camId}`);
-  if (!input) return;
-  const url = input.value.trim();
+  const statusEl = document.getElementById(`status-phone-${camId}`);
+  const modeLabel = document.getElementById(`current-mode-${camId.toLowerCase()}`);
+  const btnConnect = document.getElementById(`btn-connect-${camId}`);
+
+  let url = input ? input.value.trim() : "";
+  if (!url && input && input.placeholder) {
+    url = input.placeholder.trim();
+    if (input) input.value = url;
+  }
+
   if (!url) {
-    alert("Please enter a valid Phone Webcam stream URL (e.g. http://192.168.1.100:8080/video)");
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Please enter an IP address (e.g. 192.168.1.50:8080)</span>`;
+    }
     return;
   }
 
-  const modeLabel = document.getElementById(`current-mode-${camId.toLowerCase()}`);
+  // Auto-normalize protocol and stream endpoint
+  if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('rtsp://')) {
+    url = 'http://' + url;
+  }
+  // If user only typed IP and port (e.g. http://192.168.1.15:8080), append /video for IP Webcam
+  if (!url.includes('/video') && !url.includes('/videofeed') && !url.includes('.mjpg') && !url.startsWith('rtsp://')) {
+    url = url.replace(/\/+$/, '') + '/video';
+  }
+
+  if (input) input.value = url;
+
+  if (btnConnect) {
+    btnConnect.disabled = true;
+    btnConnect.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i>Connecting...`;
+  }
+  if (statusEl) {
+    statusEl.innerHTML = `<span class="text-amber-400"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i>Contacting stream at <code class="bg-black/50 px-1 py-0.5 rounded text-white">${url}</code>...</span>`;
+  }
   if (modeLabel) modeLabel.textContent = `Connecting to ${url}...`;
 
   try {
@@ -2605,12 +2632,43 @@ window.connectPhoneFeed = async function (camId) {
       body: JSON.stringify({ mode: 'phone_live', source_url: url })
     });
     const data = await res.json();
+    
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-check mr-1"></i>Pipeline set to <b class="text-white">${url}</b>! Connecting feed...</span>`;
+    }
     if (modeLabel) modeLabel.textContent = `Active: Phone IP (${data.status})`;
+    
     refreshStreamImage(camId);
     if (window.playAudioCue) window.playAudioCue('action');
+
+    // Poll after 2 seconds to check if phone is actively streaming frames
+    setTimeout(async () => {
+      try {
+        const checkRes = await fetch('/api/v1/cameras/streams/status');
+        if (checkRes.ok) {
+          const statuses = await checkRes.json();
+          const cur = statuses.find(s => s.camera_id === camId);
+          if (cur && statusEl) {
+            if (cur.status === 'STREAMING') {
+              statusEl.innerHTML = `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-satellite-dish mr-1"></i>LIVE STREAMING! FPS: ${cur.fps} • ${cur.frames_processed} frames</span>`;
+            } else if (cur.status === 'SOURCE_UNREACHABLE') {
+              statusEl.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Phone unreachable at ${url}. Check IP Webcam server is running & on same Wi-Fi!</span>`;
+            }
+          }
+        }
+      } catch (_) {}
+    }, 2000);
+
   } catch (err) {
-    alert(`Failed to connect phone feed: ${err.message}`);
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-xmark mr-1"></i>Connection error: ${err.message}</span>`;
+    }
     if (modeLabel) modeLabel.textContent = `Error connecting to ${url}`;
+  } finally {
+    if (btnConnect) {
+      btnConnect.disabled = false;
+      btnConnect.innerHTML = `<i class="fa-solid fa-link mr-1"></i>Connect`;
+    }
   }
 };
 

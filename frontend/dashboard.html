@@ -1513,16 +1513,26 @@
               </div>
 
               <!-- Phone IP Panel (Collapsible) -->
-              <div id="panel-phone-CAM_01" class="hidden pt-1.5 space-y-1.5">
-                <label class="block text-[11px] font-mono text-amber-300">Enter Smartphone IP Webcam Stream URL:</label>
+              <div id="panel-phone-CAM_01" class="hidden pt-1.5 space-y-2">
+                <div class="flex items-center justify-between">
+                  <label class="block text-[11px] font-mono text-amber-300 font-semibold">Smartphone IP Webcam Stream URL:</label>
+                  <span class="text-[9px] text-gray-400 font-mono">Android (IP Webcam) / iOS</span>
+                </div>
                 <div class="flex space-x-1.5">
-                  <input type="text" id="input-phone-CAM_01" placeholder="http://192.168.1.105:8080/video" class="flex-1 bg-slate-950 border border-amber-500/40 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-amber-400" />
-                  <button onclick="connectPhoneFeed('CAM_01')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg text-xs transition flex items-center space-x-1 shrink-0">
+                  <input type="text" id="input-phone-CAM_01" value="http://192.168.1.105:8080/video" placeholder="http://192.168.1.105:8080/video" class="flex-1 bg-slate-950 border border-amber-500/40 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-amber-400 select-all" />
+                  <button id="btn-connect-CAM_01" onclick="connectPhoneFeed('CAM_01')" class="px-3.5 py-1.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold rounded-lg text-xs transition flex items-center space-x-1.5 shrink-0 shadow-md">
                     <i class="fa-solid fa-link"></i>
                     <span>Connect</span>
                   </button>
                 </div>
-                <p class="text-[10px] text-gray-400">Use free Android app <b>"IP Webcam"</b> or iOS <b>"Live-Reporter"</b>, click Start Server, and paste the URL here.</p>
+                <!-- Inline Status Feedback Area -->
+                <div id="status-phone-CAM_01" class="min-h-[18px] text-[11px] font-mono"></div>
+                <div class="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-400">
+                  <span class="text-gray-500">Quick Fill:</span>
+                  <button type="button" onclick="document.getElementById('input-phone-CAM_01').value='http://192.168.43.1:8080/video'" class="px-1.5 py-0.5 rounded bg-slate-950 hover:bg-slate-800 border border-slate-700 text-amber-300 font-mono">Hotspot (192.168.43.1)</button>
+                  <button type="button" onclick="document.getElementById('input-phone-CAM_01').value='http://192.168.1.15:8080/video'" class="px-1.5 py-0.5 rounded bg-slate-950 hover:bg-slate-800 border border-slate-700 text-amber-300 font-mono">Wi-Fi (192.168.1.15)</button>
+                </div>
+                <p class="text-[10px] text-gray-400">Open <b>IP Webcam</b> on phone, tap <b>Start server</b> at bottom, and match your phone's displayed IP.</p>
               </div>
 
               <!-- Upload MP4 Panel (Collapsible) -->
@@ -1608,14 +1618,24 @@
               </div>
 
               <!-- Phone IP Panel (Collapsible) -->
-              <div id="panel-phone-CAM_02" class="hidden pt-1.5 space-y-1.5">
-                <label class="block text-[11px] font-mono text-amber-300">Enter Smartphone IP Webcam Stream URL:</label>
+              <div id="panel-phone-CAM_02" class="hidden pt-1.5 space-y-2">
+                <div class="flex items-center justify-between">
+                  <label class="block text-[11px] font-mono text-amber-300 font-semibold">Smartphone IP Webcam Stream URL:</label>
+                  <span class="text-[9px] text-gray-400 font-mono">Android (IP Webcam) / iOS</span>
+                </div>
                 <div class="flex space-x-1.5">
-                  <input type="text" id="input-phone-CAM_02" placeholder="http://192.168.1.106:8080/video" class="flex-1 bg-slate-950 border border-amber-500/40 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-amber-400" />
-                  <button onclick="connectPhoneFeed('CAM_02')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg text-xs transition flex items-center space-x-1 shrink-0">
+                  <input type="text" id="input-phone-CAM_02" value="http://192.168.1.106:8080/video" placeholder="http://192.168.1.106:8080/video" class="flex-1 bg-slate-950 border border-amber-500/40 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-amber-400 select-all" />
+                  <button id="btn-connect-CAM_02" onclick="connectPhoneFeed('CAM_02')" class="px-3.5 py-1.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold rounded-lg text-xs transition flex items-center space-x-1.5 shrink-0 shadow-md">
                     <i class="fa-solid fa-link"></i>
                     <span>Connect</span>
                   </button>
+                </div>
+                <!-- Inline Status Feedback Area -->
+                <div id="status-phone-CAM_02" class="min-h-[18px] text-[11px] font-mono"></div>
+                <div class="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-400">
+                  <span class="text-gray-500">Quick Fill:</span>
+                  <button type="button" onclick="document.getElementById('input-phone-CAM_02').value='http://192.168.43.1:8080/video'" class="px-1.5 py-0.5 rounded bg-slate-950 hover:bg-slate-800 border border-slate-700 text-amber-300 font-mono">Hotspot (192.168.43.1)</button>
+                  <button type="button" onclick="document.getElementById('input-phone-CAM_02').value='http://192.168.1.15:8080/video'" class="px-1.5 py-0.5 rounded bg-slate-950 hover:bg-slate-800 border border-slate-700 text-amber-300 font-mono">Wi-Fi (192.168.1.15)</button>
                 </div>
                 <p class="text-[10px] text-gray-400">Attach a secondary phone or another angle for full cross-intersection tracking demonstration.</p>
               </div>
@@ -2117,8 +2137,8 @@
   </nav>
 
   <!-- Script Libraries with Cache Busting -->
-  <script src="/static/js/twin-3d.js?v=2.3"></script>
-  <script src="/static/js/whatif-3d.js?v=2.3"></script>
-  <script src="/static/js/app.js?v=2.3"></script>
+  <script src="/static/js/twin-3d.js?v=3.2"></script>
+  <script src="/static/js/whatif-3d.js?v=3.2"></script>
+  <script src="/static/js/app.js?v=3.2"></script>
 </body>
 </html>

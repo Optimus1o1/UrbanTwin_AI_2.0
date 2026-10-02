@@ -60,9 +60,16 @@ class CameraStreamWorker:
             self.thread.join(timeout=1.0)
 
     def configure(self, mode: str, source_url: str = ""):
+        source_url = source_url.strip()
+        if mode == "phone_live" and source_url:
+            if not source_url.startswith(("http://", "https://", "rtsp://")):
+                source_url = "http://" + source_url
+            if not any(k in source_url for k in ["/video", "/videofeed", ".mjpg", "rtsp://"]):
+                source_url = source_url.rstrip("/") + "/video"
+
         with self.lock:
             self.mode = mode
-            self.source_url = source_url.strip()
+            self.source_url = source_url
             self.status = "CONNECTING"
             self.error_message = ""
             print(f"[VideoIngestionService] Camera {self.camera_id} reconfigured to mode '{self.mode}' (source: {self.source_url or 'Built-in Simulator'})")
@@ -90,9 +97,15 @@ class CameraStreamWorker:
                     if cap is None or current_cap_url != source:
                         if cap:
                             cap.release()
-                        cap = cv2.VideoCapture(source)
+                        try:
+                            cap = cv2.VideoCapture(source, cv2.CAP_FFMPEG)
+                        except Exception:
+                            cap = cv2.VideoCapture(source)
+                        if not cap or not cap.isOpened():
+                            cap = cv2.VideoCapture(source)
                         current_cap_url = source
-                        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                        if cap and cap.isOpened():
+                            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
                     if cap and cap.isOpened():
                         ret, raw_frame = cap.read()
