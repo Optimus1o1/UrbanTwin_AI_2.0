@@ -67,3 +67,7 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Stream uploads
+backend/data/streams/*
+!backend/data/streams/.gitkeep

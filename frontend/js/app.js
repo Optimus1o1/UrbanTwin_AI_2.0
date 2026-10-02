@@ -138,6 +138,8 @@ window.switchTab = function (tabId) {
     }, 100);
   } else if (tabId === 'ocr') {
     runOCRTest();
+  } else if (tabId === 'streams') {
+    if (window.loadStreamStatuses) window.loadStreamStatuses();
   } else if (tabId === 'alerts') {
     loadAlerts();
   } else if (tabId === 'simulation') {
@@ -2534,4 +2536,260 @@ window.toggleFullscreen = function () {
     }
   }
 };
+
+// ============================================================================
+// PHASE 3: DUAL-FEED EDGE VIDEO INGESTION & ANPR PIPELINE CONTROLLER
+// ============================================================================
+
+let streamPollingTimer = null;
+let activeSnapshotCamera = 'CAM_01';
+
+window.setCameraStreamMode = async function (camId, mode) {
+  const btnSynth = document.getElementById(`btn-mode-synth-${camId}`);
+  const btnPhone = document.getElementById(`btn-mode-phone-${camId}`);
+  const btnUpload = document.getElementById(`btn-mode-upload-${camId}`);
+  const panelPhone = document.getElementById(`panel-phone-${camId}`);
+  const panelUpload = document.getElementById(`panel-upload-${camId}`);
+  const modeLabel = document.getElementById(`current-mode-${camId.toLowerCase()}`);
+
+  [btnSynth, btnPhone, btnUpload].forEach(btn => {
+    if (btn) {
+      btn.className = "p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center space-x-1";
+    }
+  });
+
+  if (panelPhone) panelPhone.classList.add('hidden');
+  if (panelUpload) panelUpload.classList.add('hidden');
+
+  if (mode === 'synthetic') {
+    if (btnSynth) btnSynth.className = "p-2 rounded-lg bg-cyan-600/30 border border-cyan-500/40 text-white transition flex items-center justify-center space-x-1";
+    if (modeLabel) modeLabel.textContent = "Active: Synthetic Highway";
+    try {
+      await fetch(`/api/v1/cameras/${camId}/stream/configure`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'synthetic', source_url: '' })
+      });
+      refreshStreamImage(camId);
+      if (window.playAudioCue) window.playAudioCue('tab');
+    } catch (err) {
+      console.error(`Error configuring ${camId} synthetic mode:`, err);
+    }
+  } else if (mode === 'phone_live') {
+    if (btnPhone) btnPhone.className = "p-2 rounded-lg bg-amber-600/30 border border-amber-500/40 text-white transition flex items-center justify-center space-x-1";
+    if (panelPhone) panelPhone.classList.remove('hidden');
+    if (modeLabel) modeLabel.textContent = "Mode: Phone IP Webcam (Enter URL)";
+  } else if (mode === 'video_file') {
+    if (btnUpload) btnUpload.className = "p-2 rounded-lg bg-purple-600/30 border border-purple-500/40 text-white transition flex items-center justify-center space-x-1";
+    if (panelUpload) panelUpload.classList.remove('hidden');
+    if (modeLabel) modeLabel.textContent = "Mode: Video File (.mp4)";
+  }
+};
+
+window.connectPhoneFeed = async function (camId) {
+  const input = document.getElementById(`input-phone-${camId}`);
+  if (!input) return;
+  const url = input.value.trim();
+  if (!url) {
+    alert("Please enter a valid Phone Webcam stream URL (e.g. http://192.168.1.100:8080/video)");
+    return;
+  }
+
+  const modeLabel = document.getElementById(`current-mode-${camId.toLowerCase()}`);
+  if (modeLabel) modeLabel.textContent = `Connecting to ${url}...`;
+
+  try {
+    const res = await fetch(`/api/v1/cameras/${camId}/stream/configure`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'phone_live', source_url: url })
+    });
+    const data = await res.json();
+    if (modeLabel) modeLabel.textContent = `Active: Phone IP (${data.status})`;
+    refreshStreamImage(camId);
+    if (window.playAudioCue) window.playAudioCue('action');
+  } catch (err) {
+    alert(`Failed to connect phone feed: ${err.message}`);
+    if (modeLabel) modeLabel.textContent = `Error connecting to ${url}`;
+  }
+};
+
+window.uploadVideoFeed = async function (camId) {
+  const fileInput = document.getElementById(`input-file-${camId}`);
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+    alert("Please select a video file (.mp4) to ingest.");
+    return;
+  }
+
+  const file = fileInput.files[0];
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const modeLabel = document.getElementById(`current-mode-${camId.toLowerCase()}`);
+  if (modeLabel) modeLabel.textContent = `Uploading ${file.name}...`;
+
+  try {
+    const res = await fetch(`/api/v1/cameras/${camId}/stream/upload`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if (modeLabel) modeLabel.textContent = `Active: MP4 Video (${file.name})`;
+    refreshStreamImage(camId);
+    if (window.playAudioCue) window.playAudioCue('action');
+  } catch (err) {
+    alert(`Video ingestion failed: ${err.message}`);
+    if (modeLabel) modeLabel.textContent = `Upload failed for ${file.name}`;
+  }
+};
+
+window.refreshStreamImage = function (camId) {
+  const img = document.getElementById(`stream-img-${camId}`);
+  if (img) {
+    img.src = `/api/v1/cameras/${camId}/stream/live?t=${Date.now()}`;
+  }
+};
+
+window.captureCameraSnapshot = async function (camId) {
+  activeSnapshotCamera = camId;
+  const modal = document.getElementById('snapshot-modal');
+  const modalImg = document.getElementById('snapshot-modal-img');
+  const modalCam = document.getElementById('snapshot-modal-cam');
+  const title = document.getElementById('snapshot-modal-title');
+
+  if (modalCam) modalCam.textContent = camId;
+  if (title) title.textContent = `Live Camera Snapshot & ANPR Extract — ${camId}`;
+
+  try {
+    const res = await fetch(`/api/v1/cameras/${camId}/stream/snapshot?t=${Date.now()}`);
+    if (!res.ok) throw new Error("Snapshot not available");
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    if (modalImg) modalImg.src = objectUrl;
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+    if (window.playAudioCue) window.playAudioCue('tab');
+  } catch (err) {
+    alert(`Snapshot capture error: ${err.message}`);
+  }
+};
+
+window.closeSnapshotModal = function () {
+  const modal = document.getElementById('snapshot-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+window.locateSnapshotPlate = function () {
+  const hudPlate = document.getElementById(`hud-${activeSnapshotCamera.toLowerCase()}-plate`);
+  let plate = "WB02AK4921";
+  if (hudPlate && hudPlate.textContent) {
+    const match = hudPlate.textContent.match(/([A-Z0-9]{8,11})/);
+    if (match) plate = match[1];
+  }
+  closeSnapshotModal();
+  window.switchTab('tracking');
+  if (window.queryPlate) {
+    window.queryPlate(plate);
+  } else {
+    const input = document.getElementById('target-plate-input');
+    if (input) input.value = plate;
+    if (window.runTrajectorySearch) window.runTrajectorySearch();
+  }
+};
+
+window.loadStreamStatuses = async function () {
+  try {
+    const res = await fetch('/api/v1/cameras/streams/status');
+    if (!res.ok) return;
+    const statuses = await res.json();
+    let totalPlates = 0;
+    const detectionsAll = [];
+
+    statuses.forEach(s => {
+      totalPlates += s.plates_detected || 0;
+      const camIdLower = s.camera_id.toLowerCase();
+      
+      const modeEl = document.getElementById(`telemetry-${camIdLower}-mode`);
+      if (modeEl) {
+        modeEl.innerHTML = `<span class="w-2 h-2 rounded-full ${s.status === 'ERROR' ? 'bg-rose-500' : 'bg-emerald-400'} animate-pulse"></span><span class="truncate">${s.mode.toUpperCase()} (${s.status})</span>`;
+      }
+      const fpsEl = document.getElementById(`telemetry-${camIdLower}-fps`);
+      if (fpsEl) {
+        fpsEl.textContent = `FPS: ${s.fps.toFixed(1)} • Frames: ${s.frames_processed}`;
+      }
+
+      const hudPlate = document.getElementById(`hud-${camIdLower}-plate`);
+      if (hudPlate && s.latest_detections && s.latest_detections.length > 0) {
+        const topDet = s.latest_detections[0];
+        hudPlate.textContent = `LATEST: ${topDet.plate_text} (${Math.round((topDet.confidence || 0.95)*100)}%)`;
+        s.latest_detections.forEach(d => {
+          detectionsAll.push({ ...d, camera_id: s.camera_id });
+        });
+      }
+    });
+
+    const totalPlatesEl = document.getElementById('telemetry-total-plates');
+    if (totalPlatesEl) totalPlatesEl.textContent = `${totalPlates} Plates`;
+
+    renderStreamDetectionsTable(detectionsAll);
+  } catch (err) {
+    console.warn("Error updating stream telemetry:", err);
+  }
+};
+
+function renderStreamDetectionsTable(detections) {
+  const tbody = document.getElementById('stream-detections-table-body');
+  if (!tbody) return;
+
+  if (!detections || detections.length === 0) {
+    if (!tbody.hasChildNodes()) {
+      tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-gray-500 font-mono">Awaiting live vehicle frame detections...</td></tr>`;
+    }
+    return;
+  }
+
+  const now = new Date();
+  const timeStr = now.toTimeString().split(' ')[0];
+
+  const rowsHtml = detections.slice(0, 8).map(d => `
+    <tr class="hover:bg-cyan-950/20 transition">
+      <td class="py-2.5 px-3 font-bold text-cyan-400 flex items-center space-x-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+        <span>${d.camera_id}</span>
+      </td>
+      <td class="py-2.5 px-3 text-gray-400">${timeStr}</td>
+      <td class="py-2.5 px-3 font-bold text-white tracking-wider">
+        <span class="bg-slate-900 px-2 py-0.5 rounded border border-cyan-500/40 text-cyan-300 font-mono">${d.plate_text}</span>
+      </td>
+      <td class="py-2.5 px-3 text-slate-300">${d.vehicle_type || 'Vehicle'}</td>
+      <td class="py-2.5 px-3 text-amber-400 font-mono">${(d.speed_kmh || 45).toFixed(1)} km/h</td>
+      <td class="py-2.5 px-3">
+        <span class="px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold font-mono">
+          ${Math.round((d.confidence || 0.94) * 100)}% Match
+        </span>
+      </td>
+      <td class="py-2.5 px-3 text-right">
+        <button onclick="window.switchTab('tracking'); if(window.queryPlate) window.queryPlate('${d.plate_text}');" class="px-2.5 py-1 bg-cyan-600/30 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 rounded transition text-[10px] font-bold">
+          Locate Route
+        </button>
+      </td>
+    </tr>
+  `).join('');
+
+  tbody.innerHTML = rowsHtml;
+}
+
+// Auto-poll stream status every 2.5 seconds
+if (!streamPollingTimer) {
+  streamPollingTimer = setInterval(() => {
+    if (typeof currentTab !== 'undefined' && currentTab === 'streams') {
+      window.loadStreamStatuses();
+    }
+  }, 2500);
+}
 

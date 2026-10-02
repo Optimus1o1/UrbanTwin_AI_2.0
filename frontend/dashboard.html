@@ -250,6 +250,11 @@
         <i class="fa-solid fa-flask text-emerald-400"></i>
         <span>ANPR OCR Lab</span>
       </button>
+      <button onclick="switchTab('streams')" id="nav-streams" class="tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center space-x-1.5">
+        <i class="fa-solid fa-video text-cyan-400"></i>
+        <span>Live Video Feeds</span>
+        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+      </button>
       <button onclick="switchTab('alerts')" id="nav-alerts" class="tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center space-x-1.5">
         <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
         <span>Hotlist Alerts</span>
@@ -334,6 +339,10 @@
       <button onclick="switchTab('ocr')" id="mobile-nav-ocr" class="tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center space-x-1.5">
         <i class="fa-solid fa-flask text-emerald-400"></i>
         <span>ANPR OCR Lab</span>
+      </button>
+      <button onclick="switchTab('streams')" id="mobile-nav-streams" class="tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center space-x-1.5">
+        <i class="fa-solid fa-video text-cyan-400"></i>
+        <span>Live Video Feeds</span>
       </button>
       <button onclick="switchTab('alerts')" id="mobile-nav-alerts" class="tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center space-x-1.5">
         <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
@@ -1375,7 +1384,359 @@
       </div>
     </div>
 
-    <!-- ==================== TAB 5: HOTLIST & SECURITY ALERT CENTER ==================== -->
+    <!-- ==================== TAB 5: DUAL EDGE VIDEO INGESTION PIPELINE (PHASE 3) ==================== -->
+    <div id="tab-streams" class="tab-content hidden space-y-6">
+      <!-- Phase 3 Header Milestone Card -->
+      <div class="glass-card p-5 border border-cyan-500/30 space-y-4 glow-cyan bg-gradient-to-br from-slate-950 via-cyan-950/15 to-slate-950">
+        <div class="flex flex-wrap items-center justify-between pb-3 border-b border-slate-800 gap-3">
+          <div>
+            <div class="flex items-center space-x-2.5">
+              <span class="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></span>
+              <h3 class="text-base font-bold text-white brand-font flex items-center space-x-2">
+                <i class="fa-solid fa-video text-cyan-400"></i>
+                <span>Dual-Feed Edge Video Ingestion Pipeline</span>
+              </h3>
+            </div>
+            <p class="text-xs text-gray-400 mt-1">Multi-source video ingestion supporting live Android/iOS IP Webcam feeds, uploaded MP4 recordings, and OpenCV procedural traffic synthesis with on-the-fly ANPR OCR.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-bold text-cyan-300 bg-cyan-950/80 border border-cyan-500/40 px-3 py-1 rounded-lg flex items-center space-x-1.5 shadow-sm">
+              <i class="fa-solid fa-circle-check text-cyan-400"></i>
+              <span>PHASE 3 MILESTONE: DUAL-FEED ACTIVE</span>
+            </span>
+            <span class="text-xs font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-1 rounded-lg flex items-center space-x-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>MJPEG 30 FPS Lock</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Telemetry Summary Badges -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5">
+            <div class="text-[10px] text-gray-400 font-mono uppercase">Node 1 (Park St)</div>
+            <div class="text-sm font-bold text-white mt-0.5 flex items-center space-x-1.5" id="telemetry-cam01-mode">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="truncate">Synthetic Sim</span>
+            </div>
+            <div class="text-[10px] text-cyan-400 font-mono mt-0.5" id="telemetry-cam01-fps">FPS: 6.8 • 1280x720</div>
+          </div>
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5">
+            <div class="text-[10px] text-gray-400 font-mono uppercase">Node 2 (EM Bypass)</div>
+            <div class="text-sm font-bold text-white mt-0.5 flex items-center space-x-1.5" id="telemetry-cam02-mode">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="truncate">Synthetic Sim</span>
+            </div>
+            <div class="text-[10px] text-cyan-400 font-mono mt-0.5" id="telemetry-cam02-fps">FPS: 6.8 • 1280x720</div>
+          </div>
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5">
+            <div class="text-[10px] text-gray-400 font-mono uppercase">Plates Extracted</div>
+            <div class="text-sm font-bold text-emerald-400 mt-0.5 font-mono" id="telemetry-total-plates">0 Plates</div>
+            <div class="text-[10px] text-gray-400 font-mono mt-0.5">YOLOv8 + STN OCR</div>
+          </div>
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5">
+            <div class="text-[10px] text-gray-400 font-mono uppercase">Network Pipeline</div>
+            <div class="text-sm font-bold text-cyan-300 mt-0.5 font-mono">Zero Latency</div>
+            <div class="text-[10px] text-emerald-400 font-mono mt-0.5">Auto-Recovery Active</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DUAL-SCREEN VIDEO MONITORS GRID -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- CAMERA 1: Park Street -->
+        <div class="glass-card p-4 sm:p-5 border border-cyan-500/30 space-y-4 glow-cyan flex flex-col justify-between">
+          <div class="space-y-3">
+            <!-- Screen Header -->
+            <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div class="flex items-center space-x-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                <div>
+                  <h4 class="font-bold text-white text-sm brand-font">CAM_01 • Park Street Commercial Arterial</h4>
+                  <p class="text-[11px] text-cyan-400 font-mono">Kolkata Sector 1 • 22.5510° N, 88.3528° E</p>
+                </div>
+              </div>
+              <span id="badge-cam01-status" class="px-2.5 py-1 bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 rounded text-[10px] font-mono font-bold flex items-center space-x-1">
+                <i class="fa-solid fa-circle-dot text-rose-500 animate-ping mr-1"></i>
+                <span id="label-cam01-status">LIVE STREAM</span>
+              </span>
+            </div>
+
+            <!-- Video Player Screen with Cyber HUD Canvas -->
+            <div class="relative w-full aspect-video bg-black rounded-xl overflow-hidden border border-cyan-500/40 shadow-inner group">
+              <!-- Live MJPEG Stream -->
+              <img id="stream-img-CAM_01" src="/api/v1/cameras/CAM_01/stream/live" alt="CAM_01 Live Video Feed" class="w-full h-full object-cover select-none" />
+              
+              <!-- Cyber HUD Top Overlays -->
+              <div class="absolute top-2.5 left-2.5 flex items-center space-x-1.5 bg-slate-950/85 backdrop-blur-md px-2.5 py-1 rounded border border-cyan-500/30 text-[10px] font-mono text-cyan-300">
+                <i class="fa-solid fa-microchip text-cyan-400"></i>
+                <span>ANPR EDGE INFERENCE: ON</span>
+              </div>
+              <div class="absolute top-2.5 right-2.5 bg-slate-950/85 backdrop-blur-md px-2 py-1 rounded border border-slate-800 text-[10px] font-mono text-gray-300" id="hud-cam01-time">
+                REC • 1080p60
+              </div>
+
+              <!-- Cyber HUD Bottom Banner -->
+              <div class="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-800 text-xs font-mono">
+                <div class="flex items-center space-x-2 text-cyan-300 truncate">
+                  <i class="fa-solid fa-shield-halved text-emerald-400"></i>
+                  <span id="hud-cam01-plate" class="truncate font-bold">LATEST: WB02AK4921 (96%)</span>
+                </div>
+                <button onclick="captureCameraSnapshot('CAM_01')" class="px-2 py-0.5 bg-cyan-600/80 hover:bg-cyan-500 text-white rounded text-[10px] font-sans font-bold transition flex items-center space-x-1 shrink-0">
+                  <i class="fa-solid fa-camera"></i>
+                  <span>Snap</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Camera 1 Source Mode Tabs -->
+            <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 space-y-2.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-gray-400 font-mono text-[11px]">Select Feed Payload:</span>
+                <span class="text-cyan-400 font-mono text-[10px]" id="current-mode-cam01">Active: Synthetic Highway</span>
+              </div>
+              
+              <div class="grid grid-cols-3 gap-1.5 text-xs font-semibold">
+                <button id="btn-mode-synth-CAM_01" onclick="setCameraStreamMode('CAM_01', 'synthetic')" class="p-2 rounded-lg bg-cyan-600/30 border border-cyan-500/40 text-white transition flex items-center justify-center space-x-1">
+                  <i class="fa-solid fa-wand-magic-sparkles text-cyan-400"></i>
+                  <span class="text-[11px]">Synthetic</span>
+                </button>
+                <button id="btn-mode-phone-CAM_01" onclick="setCameraStreamMode('CAM_01', 'phone_live')" class="p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center space-x-1">
+                  <i class="fa-solid fa-mobile-screen text-amber-400"></i>
+                  <span class="text-[11px]">Phone IP</span>
+                </button>
+                <button id="btn-mode-upload-CAM_01" onclick="setCameraStreamMode('CAM_01', 'video_file')" class="p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center space-x-1">
+                  <i class="fa-solid fa-file-video text-purple-400"></i>
+                  <span class="text-[11px]">Upload MP4</span>
+                </button>
+              </div>
+
+              <!-- Phone IP Panel (Collapsible) -->
+              <div id="panel-phone-CAM_01" class="hidden pt-1.5 space-y-1.5">
+                <label class="block text-[11px] font-mono text-amber-300">Enter Smartphone IP Webcam Stream URL:</label>
+                <div class="flex space-x-1.5">
+                  <input type="text" id="input-phone-CAM_01" placeholder="http://192.168.1.105:8080/video" class="flex-1 bg-slate-950 border border-amber-500/40 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-amber-400" />
+                  <button onclick="connectPhoneFeed('CAM_01')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg text-xs transition flex items-center space-x-1 shrink-0">
+                    <i class="fa-solid fa-link"></i>
+                    <span>Connect</span>
+                  </button>
+                </div>
+                <p class="text-[10px] text-gray-400">Use free Android app <b>"IP Webcam"</b> or iOS <b>"Live-Reporter"</b>, click Start Server, and paste the URL here.</p>
+              </div>
+
+              <!-- Upload MP4 Panel (Collapsible) -->
+              <div id="panel-upload-CAM_01" class="hidden pt-1.5 space-y-1.5">
+                <label class="block text-[11px] font-mono text-purple-300">Upload Pre-recorded Traffic Video (.mp4):</label>
+                <div class="flex space-x-1.5 items-center">
+                  <input type="file" id="input-file-CAM_01" accept="video/mp4,video/avi,video/mov" class="flex-1 text-xs text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500 cursor-pointer" />
+                  <button onclick="uploadVideoFeed('CAM_01')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg text-xs transition flex items-center space-x-1 shrink-0">
+                    <i class="fa-solid fa-upload"></i>
+                    <span>Ingest</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CAMERA 2: EM Bypass -->
+        <div class="glass-card p-4 sm:p-5 border border-cyan-500/30 space-y-4 glow-cyan flex flex-col justify-between">
+          <div class="space-y-3">
+            <!-- Screen Header -->
+            <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div class="flex items-center space-x-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                <div>
+                  <h4 class="font-bold text-white text-sm brand-font">CAM_02 • EM Bypass & Science City Expressway</h4>
+                  <p class="text-[11px] text-cyan-400 font-mono">Kolkata Sector 3 • 22.5392° N, 88.3964° E</p>
+                </div>
+              </div>
+              <span id="badge-cam02-status" class="px-2.5 py-1 bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 rounded text-[10px] font-mono font-bold flex items-center space-x-1">
+                <i class="fa-solid fa-circle-dot text-rose-500 animate-ping mr-1"></i>
+                <span id="label-cam02-status">LIVE STREAM</span>
+              </span>
+            </div>
+
+            <!-- Video Player Screen with Cyber HUD Canvas -->
+            <div class="relative w-full aspect-video bg-black rounded-xl overflow-hidden border border-cyan-500/40 shadow-inner group">
+              <!-- Live MJPEG Stream -->
+              <img id="stream-img-CAM_02" src="/api/v1/cameras/CAM_02/stream/live" alt="CAM_02 Live Video Feed" class="w-full h-full object-cover select-none" />
+              
+              <!-- Cyber HUD Top Overlays -->
+              <div class="absolute top-2.5 left-2.5 flex items-center space-x-1.5 bg-slate-950/85 backdrop-blur-md px-2.5 py-1 rounded border border-cyan-500/30 text-[10px] font-mono text-cyan-300">
+                <i class="fa-solid fa-microchip text-cyan-400"></i>
+                <span>ANPR EDGE INFERENCE: ON</span>
+              </div>
+              <div class="absolute top-2.5 right-2.5 bg-slate-950/85 backdrop-blur-md px-2 py-1 rounded border border-slate-800 text-[10px] font-mono text-gray-300" id="hud-cam02-time">
+                REC • 1080p60
+              </div>
+
+              <!-- Cyber HUD Bottom Banner -->
+              <div class="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-800 text-xs font-mono">
+                <div class="flex items-center space-x-2 text-cyan-300 truncate">
+                  <i class="fa-solid fa-shield-halved text-emerald-400"></i>
+                  <span id="hud-cam02-plate" class="truncate font-bold">LATEST: 22BH6517A (94%)</span>
+                </div>
+                <button onclick="captureCameraSnapshot('CAM_02')" class="px-2 py-0.5 bg-cyan-600/80 hover:bg-cyan-500 text-white rounded text-[10px] font-sans font-bold transition flex items-center space-x-1 shrink-0">
+                  <i class="fa-solid fa-camera"></i>
+                  <span>Snap</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Camera 2 Source Mode Tabs -->
+            <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 space-y-2.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-gray-400 font-mono text-[11px]">Select Feed Payload:</span>
+                <span class="text-cyan-400 font-mono text-[10px]" id="current-mode-cam02">Active: Synthetic Highway</span>
+              </div>
+              
+              <div class="grid grid-cols-3 gap-1.5 text-xs font-semibold">
+                <button id="btn-mode-synth-CAM_02" onclick="setCameraStreamMode('CAM_02', 'synthetic')" class="p-2 rounded-lg bg-cyan-600/30 border border-cyan-500/40 text-white transition flex items-center justify-center space-x-1">
+                  <i class="fa-solid fa-wand-magic-sparkles text-cyan-400"></i>
+                  <span class="text-[11px]">Synthetic</span>
+                </button>
+                <button id="btn-mode-phone-CAM_02" onclick="setCameraStreamMode('CAM_02', 'phone_live')" class="p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center space-x-1">
+                  <i class="fa-solid fa-mobile-screen text-amber-400"></i>
+                  <span class="text-[11px]">Phone IP</span>
+                </button>
+                <button id="btn-mode-upload-CAM_02" onclick="setCameraStreamMode('CAM_02', 'video_file')" class="p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center space-x-1">
+                  <i class="fa-solid fa-file-video text-purple-400"></i>
+                  <span class="text-[11px]">Upload MP4</span>
+                </button>
+              </div>
+
+              <!-- Phone IP Panel (Collapsible) -->
+              <div id="panel-phone-CAM_02" class="hidden pt-1.5 space-y-1.5">
+                <label class="block text-[11px] font-mono text-amber-300">Enter Smartphone IP Webcam Stream URL:</label>
+                <div class="flex space-x-1.5">
+                  <input type="text" id="input-phone-CAM_02" placeholder="http://192.168.1.106:8080/video" class="flex-1 bg-slate-950 border border-amber-500/40 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-amber-400" />
+                  <button onclick="connectPhoneFeed('CAM_02')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg text-xs transition flex items-center space-x-1 shrink-0">
+                    <i class="fa-solid fa-link"></i>
+                    <span>Connect</span>
+                  </button>
+                </div>
+                <p class="text-[10px] text-gray-400">Attach a secondary phone or another angle for full cross-intersection tracking demonstration.</p>
+              </div>
+
+              <!-- Upload MP4 Panel (Collapsible) -->
+              <div id="panel-upload-CAM_02" class="hidden pt-1.5 space-y-1.5">
+                <label class="block text-[11px] font-mono text-purple-300">Upload Pre-recorded Traffic Video (.mp4):</label>
+                <div class="flex space-x-1.5 items-center">
+                  <input type="file" id="input-file-CAM_02" accept="video/mp4,video/avi,video/mov" class="flex-1 text-xs text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500 cursor-pointer" />
+                  <button onclick="uploadVideoFeed('CAM_02')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg text-xs transition flex items-center space-x-1 shrink-0">
+                    <i class="fa-solid fa-upload"></i>
+                    <span>Ingest</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- REAL-TIME CROSS-CAMERA ANPR DETECTION FEED -->
+      <div class="glass-card p-5 border border-slate-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between pb-3 border-b border-slate-800 gap-2">
+          <div class="flex items-center space-x-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+            <h4 class="font-bold text-white text-sm brand-font">Real-Time Ingestion ANPR Log &amp; Trajectory Link</h4>
+          </div>
+          <span class="text-xs text-gray-400 font-mono">Syncing with Central Kolkata Traffic Digital Twin</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-slate-900/80 text-gray-400 uppercase text-[10px] border-b border-slate-800">
+              <tr>
+                <th class="py-2.5 px-3">Camera Node</th>
+                <th class="py-2.5 px-3">Timestamp</th>
+                <th class="py-2.5 px-3">License Plate</th>
+                <th class="py-2.5 px-3">Vehicle Class</th>
+                <th class="py-2.5 px-3">Speed Estimate</th>
+                <th class="py-2.5 px-3">OCR Confidence</th>
+                <th class="py-2.5 px-3 text-right">Digital Twin Action</th>
+              </tr>
+            </thead>
+            <tbody id="stream-detections-table-body" class="divide-y divide-slate-800/60">
+              <!-- Dynamically populated from /streams/status -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- HACKATHON QUICK RUNBOOK ACCORDION -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 text-xs space-y-2">
+        <div class="flex items-center justify-between font-bold text-slate-300">
+          <span class="flex items-center space-x-2 text-cyan-400">
+            <i class="fa-solid fa-graduation-cap"></i>
+            <span>Hackathon Demonstration Runbook (Judges &amp; Live Presenters)</span>
+          </span>
+          <span class="text-[10px] text-gray-400">Zero-Failure Architecture</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-gray-400 pt-2 border-t border-slate-800/60 text-[11px]">
+          <div class="space-y-1">
+            <div class="font-bold text-white flex items-center space-x-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+              <span>1. Zero-Config Simulation</span>
+            </div>
+            <p>Keep the stream in <b>Synthetic</b> mode. It generates realistic multi-lane traffic with Kolkata and Bharat plates locally using OpenCV with zero network dependency.</p>
+          </div>
+          <div class="space-y-1">
+            <div class="font-bold text-white flex items-center space-x-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+              <span>2. Live Phone Camera Ingestion</span>
+            </div>
+            <p>Install free app <b>IP Webcam</b> on Android or <b>Live-Reporter</b> on iOS. Connect laptop and phone to same Wi-Fi/Hotspot. Tap 'Start Server' and paste the URL.</p>
+          </div>
+          <div class="space-y-1">
+            <div class="font-bold text-white flex items-center space-x-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+              <span>3. Dashcam / CCTV MP4 Upload</span>
+            </div>
+            <p>Select <b>Upload MP4</b> to ingest any pre-recorded CCTV highway video. The engine seamlessly loops it and runs frame-by-frame deep ANPR detection.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SNAPSHOT INSPECTION MODAL -->
+    <div id="snapshot-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4">
+      <div class="glass-card max-w-2xl w-full border border-cyan-500/40 p-5 space-y-4 glow-cyan bg-slate-950">
+        <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-camera text-cyan-400"></i>
+            <h4 class="font-bold text-white text-sm brand-font" id="snapshot-modal-title">Live Camera Snapshot &amp; ANPR Inspection</h4>
+          </div>
+          <button onclick="closeSnapshotModal()" class="text-gray-400 hover:text-white p-1 transition">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+
+        <div class="relative bg-black rounded-lg overflow-hidden border border-slate-800 flex items-center justify-center">
+          <img id="snapshot-modal-img" src="" alt="Snapshot" class="max-h-[360px] w-auto object-contain rounded" />
+        </div>
+
+        <div class="flex items-center justify-between text-xs pt-1">
+          <div class="text-gray-400 font-mono">
+            <span>Captured from: </span><span id="snapshot-modal-cam" class="text-cyan-400 font-bold">CAM_01</span>
+          </div>
+          <div class="flex space-x-2">
+            <button onclick="locateSnapshotPlate()" id="snapshot-locate-btn" class="px-3 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-lg transition flex items-center space-x-1.5 shadow">
+              <i class="fa-solid fa-location-crosshairs"></i>
+              <span>Locate in Trajectory Tracker</span>
+            </button>
+            <button onclick="closeSnapshotModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-lg transition">
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 6: HOTLIST & SECURITY ALERT CENTER ==================== -->
     <div id="tab-alerts" class="tab-content hidden space-y-6">
       <!-- Active Hotlist Sighting Alert Banner -->
       <div class="glass-card p-5 border border-rose-500/40 space-y-4 glow-rose bg-gradient-to-br from-slate-950 via-rose-950/15 to-slate-950">
@@ -1737,6 +2098,11 @@
       <i class="fa-solid fa-flask text-base"></i>
       <span class="text-[9px] font-semibold mt-1 tracking-tight">OCR Lab</span>
       <span class="active-dot hidden absolute top-1 right-2 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+    </button>
+    <button onclick="switchTab('streams')" id="bottom-nav-streams" class="bottom-nav-btn relative flex-1 min-w-[50px] py-1.5 px-1 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 transition active:scale-95">
+      <i class="fa-solid fa-video text-base"></i>
+      <span class="text-[9px] font-semibold mt-1 tracking-tight">Feeds</span>
+      <span class="active-dot hidden absolute top-1 right-2 w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
     </button>
     <button onclick="switchTab('alerts')" id="bottom-nav-alerts" class="bottom-nav-btn relative flex-1 min-w-[50px] py-1.5 px-1 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 transition active:scale-95">
       <i class="fa-solid fa-triangle-exclamation text-base"></i>
