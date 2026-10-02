@@ -447,8 +447,8 @@ HTML_CONTENT = r'''<!DOCTYPE html>
         <rect x="71" y="71" width="26" height="26" rx="6" fill="#F2EFE8"/>
       </svg>
       <div>
-        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15pt; font-weight: 800; letter-spacing: 0.12em; color: #F2EFE8; line-height: 1;">CIPHER</div>
-        <div style="font-size: 7.2pt; font-weight: 500; color: #94A3B8; letter-spacing: 0.05em; margin-top: 3px;">Decode. Build. Evolve.</div>
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15pt; font-weight: 800; letter-spacing: 0.12em; color: #F2EFE8; line-height: 1;">URBANTWIN AI</div>
+        <div style="font-size: 7.2pt; font-weight: 500; color: #94A3B8; letter-spacing: 0.05em; margin-top: 3px;">Observe. Model. Predict.</div>
       </div>
     </div>
     <div style="font-size: 7.5pt; font-weight: 600; color: #94A3B8; letter-spacing: 0.05em;">
@@ -475,11 +475,11 @@ HTML_CONTENT = r'''<!DOCTYPE html>
     <div class="cover-meta-item">
       <div class="lbl">Primary Architect & Author</div>
       <div class="val">Aniket Nandi</div>
-      <div class="sub">Lead Full-Stack AI Engineer · CIPHER</div>
+      <div class="sub">Lead Full-Stack AI Systems Architect</div>
     </div>
     <div class="cover-meta-item">
       <div class="lbl">Agency & Headquarters</div>
-      <div class="val">CIPHER Agency</div>
+      <div class="val">UrbanTwin AI Engineering Group</div>
       <div class="sub">Kolkata, West Bengal (IST)</div>
     </div>
     <div class="cover-meta-item">
@@ -490,7 +490,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
   </div>
 
   <div class="cover-footer">
-    <div>CIPHER Tech Solutions · Proprietary Document for Smart Cities, Law Enforcement & Traffic Authorities</div>
+    <div>UrbanTwin AI Systems · Proprietary Document for Smart Cities, Law Enforcement & Traffic Authorities</div>
     <div>Page 1 of 12 · Executive Release</div>
   </div>
 </div>
@@ -511,7 +511,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
         <rect x="37" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
         <rect x="71" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
       </svg>
-        <span>CIPHER</span> · URBANTWIN AI
+        <span>URBANTWIN AI</span> · TECHNICAL BLUEPRINT
       </div>
     <div>SECTION 01: EXECUTIVE VISION & PROBLEM STATEMENT</div>
   </div>
@@ -578,7 +578,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
     </div>
   </div>
   <div class="page-footer">
-    <div>CIPHER Web & AI Solutions · UrbanTwin AI Project Proposal</div>
+    <div>UrbanTwin AI Systems & Infrastructure · UrbanTwin AI Project Proposal</div>
     <div class="page-num">Page 2 of 12</div>
   </div>
 </div>
@@ -599,7 +599,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
         <rect x="37" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
         <rect x="71" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
       </svg>
-        <span>CIPHER</span> · URBANTWIN AI
+        <span>URBANTWIN AI</span> · TECHNICAL BLUEPRINT
       </div>
     <div>SECTION 02: OBJECTIVES & SYSTEM ARCHITECTURE</div>
   </div>
@@ -714,7 +714,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
     </div>
   </div>
   <div class="page-footer">
-    <div>CIPHER Web & AI Solutions · UrbanTwin AI Project Proposal</div>
+    <div>UrbanTwin AI Systems & Infrastructure · UrbanTwin AI Project Proposal</div>
     <div class="page-num">Page 3 of 12</div>
   </div>
 </div>
@@ -735,7 +735,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
         <rect x="37" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
         <rect x="71" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
       </svg>
-        <span>CIPHER</span> · URBANTWIN AI
+        <span>URBANTWIN AI</span> · TECHNICAL BLUEPRINT
       </div>
     <div>SECTION 03: EDGE TELEMETRY & STN-CRNN OCR</div>
   </div>
@@ -847,7 +847,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
     </div>
   </div>
   <div class="page-footer">
-    <div>CIPHER Web & AI Solutions · UrbanTwin AI Project Proposal</div>
+    <div>UrbanTwin AI Systems & Infrastructure · UrbanTwin AI Project Proposal</div>
     <div class="page-num">Page 4 of 12</div>
   </div>
 </div>
@@ -868,7 +868,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
         <rect x="37" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
         <rect x="71" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
       </svg>
-        <span>CIPHER</span> · URBANTWIN AI
+        <span>URBANTWIN AI</span> · TECHNICAL BLUEPRINT
       </div>
     <div>SECTION 04: PRIVACY, REID & MACRO ANALYTICS</div>
   </div>
@@ -983,7 +983,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
     </div>
   </div>
   <div class="page-footer">
-    <div>CIPHER Web & AI Solutions · UrbanTwin AI Project Proposal</div>
+    <div>UrbanTwin AI Systems & Infrastructure · UrbanTwin AI Project Proposal</div>
     <div class="page-num">Page 5 of 12</div>
   </div>
 </div>
@@ -1004,7 +1004,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
         <rect x="37" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
         <rect x="71" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
       </svg>
-        <span>CIPHER</span> · URBANTWIN AI
+        <span>URBANTWIN AI</span> · TECHNICAL BLUEPRINT
       </div>
     <div>SECTION 05: BEHAVIORAL RADAR & ML FORECASTING</div>
   </div>
@@ -1112,7 +1112,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
     </table>
   </div>
   <div class="page-footer">
-    <div>CIPHER Web & AI Solutions · UrbanTwin AI Project Proposal</div>
+    <div>UrbanTwin AI Systems & Infrastructure · UrbanTwin AI Project Proposal</div>
     <div class="page-num">Page 6 of 12</div>
   </div>
 </div>
@@ -1133,7 +1133,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
         <rect x="37" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
         <rect x="71" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
       </svg>
-        <span>CIPHER</span> · URBANTWIN AI
+        <span>URBANTWIN AI</span> · TECHNICAL BLUEPRINT
       </div>
     <div>SECTION 06: DIGITAL TWIN SIMULATION & 3D UI</div>
   </div>
@@ -1208,7 +1208,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
     </ul>
   </div>
   <div class="page-footer">
-    <div>CIPHER Web & AI Solutions · UrbanTwin AI Project Proposal</div>
+    <div>UrbanTwin AI Systems & Infrastructure · UrbanTwin AI Project Proposal</div>
     <div class="page-num">Page 7 of 12</div>
   </div>
 </div>
@@ -1229,7 +1229,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
         <rect x="37" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
         <rect x="71" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
       </svg>
-        <span>CIPHER</span> · URBANTWIN AI
+        <span>URBANTWIN AI</span> · TECHNICAL BLUEPRINT
       </div>
     <div>SECTION 07: TECH STACK & DATABASE SCHEMA</div>
   </div>
@@ -1402,7 +1402,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
     </table>
   </div>
   <div class="page-footer">
-    <div>CIPHER Web & AI Solutions · UrbanTwin AI Project Proposal</div>
+    <div>UrbanTwin AI Systems & Infrastructure · UrbanTwin AI Project Proposal</div>
     <div class="page-num">Page 8 of 12</div>
   </div>
 </div>
@@ -1423,7 +1423,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
         <rect x="37" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
         <rect x="71" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
       </svg>
-        <span>CIPHER</span> · URBANTWIN AI
+        <span>URBANTWIN AI</span> · TECHNICAL BLUEPRINT
       </div>
     <div>SECTION 08: REST API & SYSTEM HARDENING</div>
   </div>
@@ -1550,7 +1550,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
     </div>
   </div>
   <div class="page-footer">
-    <div>CIPHER Web & AI Solutions · UrbanTwin AI Project Proposal</div>
+    <div>UrbanTwin AI Systems & Infrastructure · UrbanTwin AI Project Proposal</div>
     <div class="page-num">Page 9 of 12</div>
   </div>
 </div>
@@ -1571,7 +1571,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
         <rect x="37" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
         <rect x="71" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
       </svg>
-        <span>CIPHER</span> · URBANTWIN AI
+        <span>URBANTWIN AI</span> · TECHNICAL BLUEPRINT
       </div>
     <div>SECTION 09: BENCHMARKING & EVALUATION MATRIX</div>
   </div>
@@ -1692,7 +1692,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
     </div>
   </div>
   <div class="page-footer">
-    <div>CIPHER Web & AI Solutions · UrbanTwin AI Project Proposal</div>
+    <div>UrbanTwin AI Systems & Infrastructure · UrbanTwin AI Project Proposal</div>
     <div class="page-num">Page 10 of 12</div>
   </div>
 </div>
@@ -1713,7 +1713,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
         <rect x="37" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
         <rect x="71" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
       </svg>
-        <span>CIPHER</span> · URBANTWIN AI
+        <span>URBANTWIN AI</span> · TECHNICAL BLUEPRINT
       </div>
     <div>SECTION 10: ROADMAP & SYSTEM DESIGN BLUEPRINT</div>
   </div>
@@ -1811,7 +1811,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
     </div>
   </div>
   <div class="page-footer">
-    <div>CIPHER Web & AI Solutions · UrbanTwin AI Project Proposal</div>
+    <div>UrbanTwin AI Systems & Infrastructure · UrbanTwin AI Project Proposal</div>
     <div class="page-num">Page 11 of 12</div>
   </div>
 </div>
@@ -1832,7 +1832,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
         <rect x="37" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
         <rect x="71" y="71" width="26" height="26" rx="6" fill="#0F1013"/>
       </svg>
-        <span>CIPHER</span> · URBANTWIN AI
+        <span>URBANTWIN AI</span> · TECHNICAL BLUEPRINT
       </div>
     <div>SECTION 11: GOVERNANCE, IP & FORMAL SIGN-OFF</div>
   </div>
@@ -1885,10 +1885,10 @@ HTML_CONTENT = r'''<!DOCTYPE html>
           </svg>
           <div>
             <div style="font-family: 'Space Grotesk', sans-serif; font-size: 12pt; font-weight: 800; color: #0F172A; letter-spacing: 0.08em; line-height: 1;">
-              CIPHER
+              URBANTWIN AI
             </div>
             <div style="font-size: 7.2pt; font-weight: 600; color: #E0A45C; margin-top: 2px;">
-              Decode. Build. Evolve.
+              Observe. Model. Predict.
             </div>
           </div>
         </div>
@@ -1913,7 +1913,7 @@ HTML_CONTENT = r'''<!DOCTYPE html>
     </div>
   </div>
   <div class="page-footer">
-    <div>CIPHER Web & AI Solutions · UrbanTwin AI Project Proposal</div>
+    <div>UrbanTwin AI Systems & Infrastructure · UrbanTwin AI Project Proposal</div>
     <div class="page-num">Page 12 of 12</div>
   </div>
 </div>

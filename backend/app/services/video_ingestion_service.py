@@ -354,6 +354,11 @@ class LiveVehicleRecognitionEngine:
                     self.last_recognized_plate = rec_plate
                     self.last_recognized_conf = round(rec_conf, 3)
                     self.last_recognized_time = now
+                    try:
+                        from app.services.matching_service import reconstruct_trajectory
+                        reconstruct_trajectory(rec_plate)
+                    except Exception:
+                        pass
             except Exception:
                 pass
             self.pending_ocr_future = None

@@ -2,7 +2,7 @@
 
 > **Target Use Case:** Knowledge Base source document for Retrieval-Augmented Generation (RAG) vector embeddings (ChromaDB, Pinecone, FAISS, Weaviate, LangChain, LlamaIndex), system prompts, and administrative AI assistants.  
 > **Project Name:** UrbanTwin AI 2.0 (Centralized ANPR & City Traffic Digital Twin Command Center)  
-> **Agency & Lead Developer:** CIPHER — *Decode. Build. Evolve.* (Lead: Aniket Nandi, Kolkata, India)  
+> **Author & Lead Systems Architect:** Aniket Nandi (Kolkata, West Bengal, India)  
 > **Active Release:** Version 2.4.0 (Phase 1, Phase 2, and Phase 3 Fully Certified)  
 > **Primary Deployment Geography:** Kolkata Metropolitan Area, West Bengal, India  
 
@@ -47,7 +47,7 @@ UrbanTwin AI follows a clean decoupled micro-monolith architecture designed for 
 - **Video Processing:** OpenCV `cv2.VideoCapture` with FFMPEG hardware abstraction, multi-threaded `CameraStreamWorker` daemon threads
 
 ### Frontend Command Center Cockpit
-- **Design Philosophy:** CIPHER Cyber-Dark Glassmorphic UI (Ink `#0F1013`, Slate `#8B9099`, Cyan `#00F0FF`, Emerald `#10B981`, Amber `#F59E0B`, Rose `#F43F5E`)
+- **Design Philosophy:** UrbanTwin Cyber-Dark Glassmorphic UI (Ink `#0F1013`, Slate `#8B9099`, Cyan `#00F0FF`, Emerald `#10B981`, Amber `#F59E0B`, Rose `#F43F5E`)
 - **Structure & Layout:** Semantic HTML5, Tailwind CSS with mobile-first responsive breakpoints (<1024px bottom rail, desktop header tabs)
 - **3D WebGL Digital Twin:** Three.js (r128), custom wireframe building shaders, particle highway vehicle flows, orbit/drone/chase camera controllers
 - **GIS Cartography:** Leaflet.js with CartoDB Cyber-Dark vector tiles, zero-watermark configuration, geo-referenced to Kolkata coordinates (`22.5726° N, 88.3639° E`)

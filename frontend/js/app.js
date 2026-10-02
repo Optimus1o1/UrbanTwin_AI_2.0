@@ -307,16 +307,22 @@ function populateCameraPins(cams) {
 
 // SINGLE PLATE TRAJECTORY TRACKING ENGINE
 window.queryPlate = function (plate) {
+  const cleanPlate = (plate || '').trim().toUpperCase();
   const input = document.getElementById('plate-search-input');
-  if (input) input.value = plate;
-  activeTrackedPlate = plate;
-  runTrajectorySearch();
+  if (input) input.value = cleanPlate;
+  activeTrackedPlate = cleanPlate;
+  if (typeof currentTab !== 'undefined' && currentTab !== 'tracking') {
+    window.switchTab('tracking');
+  } else {
+    runTrajectorySearch();
+  }
 };
 
 window.runTrajectorySearch = async function () {
   const input = document.getElementById('plate-search-input');
-  const plate = input ? input.value.trim().toUpperCase() : activeTrackedPlate;
+  const plate = (input && input.value.trim().toUpperCase()) ? input.value.trim().toUpperCase() : (activeTrackedPlate || '7XYZ912');
   activeTrackedPlate = plate;
+  if (input) input.value = plate;
 
   try {
     const res = await fetch(`/api/v1/vehicles/${encodeURIComponent(plate)}/trajectory`);

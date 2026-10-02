@@ -252,6 +252,21 @@ def test_single_plate_trajectory_reconstruction():
     assert traj["avg_speed_kmh"] > 0
 
 
+def test_dynamic_live_plate_trajectory_reconstruction():
+    # Test that querying a newly recognized camera plate generates a valid trajectory
+    res = client.get("/api/v1/vehicles/WB02AK4921/trajectory")
+    assert res.status_code == 200
+    traj = res.json()
+    assert traj["plate_text"] == "WB02AK4921"
+    assert traj["plate_masked"].startswith("WB0")
+    assert traj["total_waypoints"] >= 3
+    assert len(traj["waypoints"]) >= 3
+    assert len(traj["route_coordinates"]) >= 3
+    assert len(traj["route_3d_coordinates"]) >= 3
+    assert traj["total_distance_km"] > 0
+    assert traj["avg_speed_kmh"] > 0
+
+
 def test_macro_traffic_flow_and_od_analytics():
     # Test Macro Overview
     res_macro = client.get("/api/v1/traffic/macro")

@@ -98,8 +98,44 @@ def reconstruct_trajectory(plate_query: str) -> Optional[VehicleTrajectory]:
             break
             
     if not matched_key:
-        # Generate on-the-fly realistic trajectory for any queried plate
-        matched_key = "7XYZ912"
+        # Generate on-the-fly realistic Kolkata trajectory for any queried or newly recognized plate
+        plate_str = clean_q if clean_q else "UNKNOWN"
+        plate_seed = sum(ord(c) for c in plate_str)
+        rng = random.Random(plate_seed)
+
+        vehicle_classes = [
+            "Sedan (Hyundai Verna)", "SUV (Tata Harrier)", "Hatchback (Maruti Swift)",
+            "Sedan (Honda City)", "Compact SUV (Kia Seltos)", "Commercial Delivery Van"
+        ]
+        vehicle_colors = ["Polar White", "Diamond Black", "Silver Metallic", "Granite Grey", "Crimson Red"]
+
+        chosen_class = vehicle_classes[plate_seed % len(vehicle_classes)]
+        chosen_color = vehicle_colors[plate_seed % len(vehicle_colors)]
+
+        # Kolkata corridor nodes with realistic GIS and spatial coordinates
+        candidate_nodes = [
+            {"camera_id": "CAM_04", "name": "Howrah Bridge - Strand Road Crossing", "time": "10:02:15", "lat": 22.5851, "lng": 88.3468, "x_3d": -25.0, "z_3d": -15.0, "speed": 38.2, "heading": "Eastbound"},
+            {"camera_id": "CAM_01", "name": "Park Street - Chowringhee Crossing", "time": "10:08:42", "lat": 22.5535, "lng": 88.3512, "x_3d": -10.0, "z_3d": -5.0, "speed": 46.5, "heading": "South-East"},
+            {"camera_id": "CAM_03", "name": "Maa Flyover - Park Circus 7-Point", "time": "10:15:18", "lat": 22.5438, "lng": 88.3683, "x_3d": 0.0, "z_3d": 5.0, "speed": 55.0, "heading": "Eastbound"},
+            {"camera_id": "CAM_02", "name": "EM Bypass - Science City Junction", "time": "10:22:50", "lat": 22.5396, "lng": 88.3965, "x_3d": 12.0, "z_3d": 15.0, "speed": 52.1, "heading": "North-East"},
+            {"camera_id": "CAM_05", "name": "Salt Lake Sector V - College More", "time": "10:33:10", "lat": 22.5735, "lng": 88.4331, "x_3d": 25.0, "z_3d": 22.0, "speed": 48.0, "heading": "North-East"},
+            {"camera_id": "CAM_06", "name": "New Town Major Arterial - Biswa Bangla Gate", "time": "10:44:20", "lat": 22.5905, "lng": 88.4744, "x_3d": 30.0, "z_3d": 25.0, "speed": 54.0, "heading": "Eastbound"}
+        ]
+
+        start_idx = plate_seed % 3
+        count = 3 + (plate_seed % 2)
+        selected_nodes = candidate_nodes[start_idx:start_idx + count]
+
+        dynamic_entry = {
+            "plate_text": plate_str,
+            "vehicle_class": chosen_class,
+            "vehicle_color": chosen_color,
+            "is_blacklisted": False,
+            "blacklist_reason": None,
+            "waypoints_raw": selected_nodes
+        }
+        TRAJECTORIES_DB[plate_str] = dynamic_entry
+        matched_key = plate_str
 
     data = TRAJECTORIES_DB[matched_key]
     raw_wps = data["waypoints_raw"]

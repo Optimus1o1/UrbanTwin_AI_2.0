@@ -5,8 +5,8 @@
 
 ### 🏛️ Executive Metadata
 * **Project Name:** UrbanTwin AI (Multi-Camera Traffic Intelligence & Predictive Urban Digital Twin)
-* **Lead Architect & Author:** **Aniket Nandi** (*Lead Full-Stack AI Engineer & Designer*)
-* **Agency / Organization:** **CIPHER** — *Decode. Build. Evolve.* (Kolkata, West Bengal, India · IST)
+* **Author & Lead Architect:** **Aniket Nandi** (*Lead Full-Stack AI Systems Architect*)
+* **Organization:** **UrbanTwin AI Labs** — *Observe. Model. Predict.* (Kolkata, West Bengal, India · IST)
 * **Target Audience:** Smart Cities Authorities, Municipal Traffic Police, Urban Planning Commissions, Transport Ministries
 * **Document Status:** Complete Architecture & Implementation Blueprint
 * **Release Date:** September 2026
@@ -409,11 +409,11 @@ Self-contained interactive Jupyter notebook ([`UrbanTwin_AI_Personalized_Model_C
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│  CIPHER — Decode. Build. Evolve.                                       │
+│  UrbanTwin AI Labs — Observe. Model. Predict.                         │
 │  Lead Architect: Aniket Nandi                                          │
-│  Role: Lead Full-Stack AI Engineer & Designer                          │
+│  Role: Lead Full-Stack AI Systems Architect                            │
 │  Headquarters: Kolkata, West Bengal, India (IST)                       │
-│  Agency Domain: Web Design, AI Engineering & SaaS Systems              │
+│  Domain: Distributed ANPR, Edge AI & Urban Digital Twins               │
 │                                                                        │
 │  [ENTERPRISE SEAL] VERIFIED ARCHITECTURE · v2.4.0 · VALIDITY: 30 DAYS  │
 └────────────────────────────────────────────────────────────────────────┘
