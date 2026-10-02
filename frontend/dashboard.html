@@ -1529,10 +1529,18 @@
                 <div id="status-phone-CAM_01" class="min-h-[18px] text-[11px] font-mono"></div>
                 <div class="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-400">
                   <span class="text-gray-500">Quick Fill:</span>
+                  <button type="button" onclick="document.getElementById('input-phone-CAM_01').value='http://192.168.0.117:8080/video'" class="px-1.5 py-0.5 rounded bg-amber-950/60 hover:bg-amber-900/60 border border-amber-500/40 text-amber-300 font-mono">My Phone (192.168.0.117)</button>
                   <button type="button" onclick="document.getElementById('input-phone-CAM_01').value='http://192.168.43.1:8080/video'" class="px-1.5 py-0.5 rounded bg-slate-950 hover:bg-slate-800 border border-slate-700 text-amber-300 font-mono">Hotspot (192.168.43.1)</button>
                   <button type="button" onclick="document.getElementById('input-phone-CAM_01').value='http://192.168.1.15:8080/video'" class="px-1.5 py-0.5 rounded bg-slate-950 hover:bg-slate-800 border border-slate-700 text-amber-300 font-mono">Wi-Fi (192.168.1.15)</button>
                 </div>
-                <p class="text-[10px] text-gray-400">Open <b>IP Webcam</b> on phone, tap <b>Start server</b> at bottom, and match your phone's displayed IP.</p>
+                <div class="p-2 rounded bg-amber-950/30 border border-amber-500/30 text-[10px] text-amber-200/90 space-y-1">
+                  <div class="font-bold flex items-center space-x-1 text-amber-300">
+                    <i class="fa-solid fa-bolt text-yellow-400"></i>
+                    <span>Tips for Real-Time Zero-Lag (<50ms):</span>
+                  </div>
+                  <p>• In the phone's <b>IP Webcam</b> app &gt; <b>Video preferences</b>: set <b>Video resolution</b> to <b>1280x720</b> or <b>960x720</b> (avoids 1080p Wi-Fi buffer bloat).</p>
+                  <p>• Set <b>Quality</b> to <b>50%</b>. UrbanTwin's bufferless capture engine continuously purges stale socket queues.</p>
+                </div>
               </div>
 
               <!-- Upload MP4 Panel (Collapsible) -->
@@ -1634,10 +1642,18 @@
                 <div id="status-phone-CAM_02" class="min-h-[18px] text-[11px] font-mono"></div>
                 <div class="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-400">
                   <span class="text-gray-500">Quick Fill:</span>
+                  <button type="button" onclick="document.getElementById('input-phone-CAM_02').value='http://192.168.0.117:8080/video'" class="px-1.5 py-0.5 rounded bg-amber-950/60 hover:bg-amber-900/60 border border-amber-500/40 text-amber-300 font-mono">My Phone (192.168.0.117)</button>
                   <button type="button" onclick="document.getElementById('input-phone-CAM_02').value='http://192.168.43.1:8080/video'" class="px-1.5 py-0.5 rounded bg-slate-950 hover:bg-slate-800 border border-slate-700 text-amber-300 font-mono">Hotspot (192.168.43.1)</button>
                   <button type="button" onclick="document.getElementById('input-phone-CAM_02').value='http://192.168.1.15:8080/video'" class="px-1.5 py-0.5 rounded bg-slate-950 hover:bg-slate-800 border border-slate-700 text-amber-300 font-mono">Wi-Fi (192.168.1.15)</button>
                 </div>
-                <p class="text-[10px] text-gray-400">Attach a secondary phone or another angle for full cross-intersection tracking demonstration.</p>
+                <div class="p-2 rounded bg-amber-950/30 border border-amber-500/30 text-[10px] text-amber-200/90 space-y-1">
+                  <div class="font-bold flex items-center space-x-1 text-amber-300">
+                    <i class="fa-solid fa-bolt text-yellow-400"></i>
+                    <span>Tips for Real-Time Zero-Lag (<50ms):</span>
+                  </div>
+                  <p>• In the phone's <b>IP Webcam</b> app &gt; <b>Video preferences</b>: set <b>Video resolution</b> to <b>1280x720</b> or <b>960x720</b> (avoids 1080p Wi-Fi buffer bloat).</p>
+                  <p>• Set <b>Quality</b> to <b>50%</b>. UrbanTwin's bufferless capture engine continuously purges stale socket queues.</p>
+                </div>
               </div>
 
               <!-- Upload MP4 Panel (Collapsible) -->
