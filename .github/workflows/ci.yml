@@ -27,12 +27,14 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -r backend/requirements.txt
 
       - name: Run Pytest Test Suite
         env:
           SECRET_KEY: test-secret-key-for-github-actions-ci-pass
           ANPR_SALT: test-anpr-salt-ci-pass
+          PYTHONPATH: backend
         run: |
           pytest backend
 

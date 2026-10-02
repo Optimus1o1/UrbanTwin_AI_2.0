@@ -21,7 +21,10 @@ Pipeline Architecture:
 
 import io
 import re
-import cv2
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 import numpy as np
 from typing import Tuple, Optional, List, Dict, Any
 from PIL import Image
@@ -282,6 +285,8 @@ def localize_plate_candidates(img_rgb: np.ndarray) -> List[Tuple[np.ndarray, Tup
     Returns: List of (cropped_image_rgb, (x, y, w, h), method_name)
     """
     h, w = img_rgb.shape[:2]
+    if cv2 is None:
+        return [(img_rgb, (0, 0, w, h), 'full_image')]
     # Downscale oversized smartphone uploads to optimal processing bounds (prevent CPU latency bottlenecks)
     if max(h, w) > 1600:
         scale = 1400.0 / max(h, w)
@@ -395,6 +400,8 @@ def _normalize_crop_dimensions(crop_rgb: np.ndarray) -> np.ndarray:
     Upscales small plate crops to optimal ANPR height (80-120px) using bicubic interpolation.
     Downscales massive crops (>1400px) to prevent memory bottlenecks.
     """
+    if cv2 is None:
+        return crop_rgb
     ch, cw = crop_rgb.shape[:2]
     if ch < 80:
         scale = 95.0 / max(1, ch)
@@ -417,6 +424,8 @@ def _enhance_crop_variants(crop_rgb: np.ndarray) -> List[np.ndarray]:
     """
     normalized = _normalize_crop_dimensions(crop_rgb)
     variants = [normalized]
+    if cv2 is None:
+        return variants
 
     try:
         gray = cv2.cvtColor(normalized, cv2.COLOR_RGB2GRAY)
@@ -441,6 +450,8 @@ def recognize_plate_from_image(image_bytes: bytes) -> Tuple[str, float, str, Lis
     4. Disambiguates characters and extracts exact license plate tokens
     Returns: (plate_text, confidence, engine_name, all_detected_texts, best_crop_pil)
     """
+    if cv2 is None:
+        return ("", 0.0, "OpenCV (unavailable)", [], None)
     reader = _get_ocr_reader()
     if reader is None:
         return ("", 0.0, "EasyOCR (unavailable)", [], None)
