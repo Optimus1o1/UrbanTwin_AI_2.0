@@ -1,7 +1,10 @@
 # 🏙️ UrbanTwin AI
 
+**Live Production Deployment:** [https://urbantwin-ai-v2.onrender.com/](https://urbantwin-ai-v2.onrender.com/)
 
 > **Multi-Camera Traffic Intelligence & Predictive Urban Digital Twin API**
+
+[![Live Demo](https://img.shields.io/badge/Render-Live%20Demo-46E3B7?style=flat&logo=render&logoColor=white)](https://urbantwin-ai-v2.onrender.com/)
 
 [![Interactive Swagger UI](https://img.shields.io/badge/Swagger%20UI-Interactive%20Docs-009688.svg?logo=swagger)](/docs)
 [![ReDoc Reference](https://img.shields.io/badge/ReDoc-API%20Reference-purple.svg?logo=openapi-initiative)](/redoc)
