@@ -55,10 +55,10 @@
     camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.5, 300);
     camera.position.set(0, 38, 56);
 
-    // Renderer with optimized Pixel Ratio (capping to 1.25 prevents 4x pixel over-draw lag on high-DPI screens)
+    // Renderer with optimized Pixel Ratio (capped to 1.0-1.1 to eliminate high-DPI GPU overdraw lag)
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
     renderer.setSize(container.clientWidth, container.clientHeight);
-    const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.0 : 1.25);
+    const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.0 : 1.1);
     renderer.setPixelRatio(dpr);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
@@ -553,13 +553,22 @@
     lasersGroup.add(laser);
   };
 
-  // ANIMATION LOOP WITH AUTO-PAUSE (Eliminates lag when scrolled offscreen)
+  // ANIMATION LOOP WITH AUTO-PAUSE & 60 FPS CAP (Eliminates 120/144Hz high refresh GPU thermal lag)
   let isRunning = true;
   let animFrameId = null;
+  let lastFrameTime = 0;
+  const targetFrameInterval = 1000 / 60; // 60 FPS target cap
 
-  function animate() {
+  function animate(now) {
     if (!isRunning) return;
     animFrameId = requestAnimationFrame(animate);
+
+    if (now) {
+      const elapsedSinceLast = now - lastFrameTime;
+      if (elapsedSinceLast < targetFrameInterval) return;
+      lastFrameTime = now - (elapsedSinceLast % targetFrameInterval);
+    }
+
     const delta = clock.getDelta();
     const elapsed = clock.getElapsedTime();
 

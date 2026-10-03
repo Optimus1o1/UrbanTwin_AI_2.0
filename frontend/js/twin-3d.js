@@ -98,9 +98,9 @@
     container.innerHTML = '';
     if (animFrameId) cancelAnimationFrame(animFrameId);
 
-    // 1. Scene with transparent clear background
+    // 1. Scene with optimized solid background (eliminates alpha compositor blending overhead)
     scene = new THREE.Scene();
-    scene.background = null; // TRANSPARENT CANVAS: lets underlying glass-card backdrop shine through!
+    scene.background = new THREE.Color(0x060c1c);
     scene.fog = new THREE.FogExp2(0x060c1c, 0.010);
 
     // 2. Camera setup
@@ -108,14 +108,14 @@
     camera = new THREE.PerspectiveCamera(48, aspect, 0.5, 450);
     updateCameraFromSpherical();
 
-    // 3. High-Performance WebGL Renderer with Alpha: true & Capped Pixel Ratio
+    // 3. High-Performance WebGL Renderer with Alpha: false & Capped Pixel Ratio
     renderer = new THREE.WebGLRenderer({
       antialias: true,
-      alpha: true, // Transparent background!
+      alpha: false,
       powerPreference: "high-performance"
     });
     renderer.setSize(container.clientWidth, container.clientHeight || 520);
-    const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.0 : 1.25);
+    const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.0 : 1.1);
     renderer.setPixelRatio(dpr);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.35;
@@ -475,17 +475,14 @@
   function createTransparentSkyscraper(x, z, w, h, d, baseColor, edgeColor) {
     const bGeo = new THREE.BoxGeometry(w, h, d);
 
-    // Translucent Glass Material: depthWrite: false prevents z-fighting among overlapping transparent planes!
-    const bMat = new THREE.MeshPhysicalMaterial({
+    // High-performance translucent glass material without expensive transmission refraction passes
+    const bMat = new THREE.MeshStandardMaterial({
       color: baseColor,
-      roughness: 0.08,
-      metalness: 0.15,
+      roughness: 0.15,
+      metalness: 0.35,
       transparent: true,
-      opacity: currentOpacity,
-      depthWrite: false,
-      transmission: 0.6,
-      ior: 1.45,
-      reflectivity: 0.5
+      opacity: Math.max(0.35, currentOpacity),
+      depthWrite: false
     });
 
     const building = new THREE.Mesh(bGeo, bMat);
@@ -576,14 +573,13 @@
 
     tiers.forEach(t => {
       const geo = new THREE.CylinderGeometry(t.radius * 0.8, t.radius, t.height, 6);
-      const mat = new THREE.MeshPhysicalMaterial({
+      const mat = new THREE.MeshStandardMaterial({
         color: t.color,
-        roughness: 0.05,
-        metalness: 0.2,
+        roughness: 0.15,
+        metalness: 0.35,
         transparent: true,
-        opacity: currentOpacity + 0.05,
-        depthWrite: false,
-        transmission: 0.65
+        opacity: Math.max(0.35, currentOpacity + 0.05),
+        depthWrite: false
       });
       const tierMesh = new THREE.Mesh(geo, mat);
       tierMesh.position.y = t.yOffset;
@@ -632,11 +628,12 @@
 
     [-spacing / 2, spacing / 2].forEach(xOff => {
       const geo = new THREE.BoxGeometry(4.2, h, 4.2);
-      const mat = new THREE.MeshPhysicalMaterial({
+      const mat = new THREE.MeshStandardMaterial({
         color: 0x8b5cf6,
-        roughness: 0.08,
+        roughness: 0.15,
+        metalness: 0.35,
         transparent: true,
-        opacity: currentOpacity,
+        opacity: Math.max(0.35, currentOpacity),
         depthWrite: false
       });
       const tower = new THREE.Mesh(geo, mat);
@@ -664,9 +661,10 @@
 
     // Transparent Connecting Skybridge at Y = 28
     const bridgeGeo = new THREE.BoxGeometry(spacing, 2.2, 2.5);
-    const bridgeMat = new THREE.MeshPhysicalMaterial({
+    const bridgeMat = new THREE.MeshStandardMaterial({
       color: 0x00f0ff,
-      roughness: 0.1,
+      roughness: 0.15,
+      metalness: 0.35,
       transparent: true,
       opacity: 0.55,
       depthWrite: false
@@ -693,14 +691,13 @@
     const geo = new THREE.OctahedronGeometry(6.5, 0);
     geo.scale(0.8, 3.2, 0.8);
 
-    const mat = new THREE.MeshPhysicalMaterial({
+    const mat = new THREE.MeshStandardMaterial({
       color: 0x06b6d4,
-      roughness: 0.05,
-      metalness: 0.1,
+      roughness: 0.15,
+      metalness: 0.35,
       transparent: true,
-      opacity: currentOpacity + 0.05,
-      depthWrite: false,
-      transmission: 0.7
+      opacity: Math.max(0.35, currentOpacity + 0.05),
+      depthWrite: false
     });
 
     const mesh = new THREE.Mesh(geo, mat);
@@ -729,14 +726,13 @@
     domeGroup.position.set(cx, 0, cz);
 
     const geo = new THREE.SphereGeometry(5.0, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);
-    const mat = new THREE.MeshPhysicalMaterial({
+    const mat = new THREE.MeshStandardMaterial({
       color: 0x10b981,
-      roughness: 0.1,
-      metalness: 0.2,
+      roughness: 0.15,
+      metalness: 0.35,
       transparent: true,
-      opacity: currentOpacity + 0.1,
-      depthWrite: false,
-      transmission: 0.6
+      opacity: Math.max(0.35, currentOpacity + 0.1),
+      depthWrite: false
     });
     const dome = new THREE.Mesh(geo, mat);
     domeGroup.add(dome);
@@ -1769,9 +1765,19 @@
     }
   };
 
-  function animate() {
+  let lastTwinFrameTime = 0;
+  const twinTargetFrameInterval = 1000 / 60; // 60 FPS target cap
+
+  function animate(now) {
     if (!isTwinRendering) return;
     animFrameId = requestAnimationFrame(animate);
+
+    if (now) {
+      const elapsedSinceLast = now - lastTwinFrameTime;
+      if (elapsedSinceLast < twinTargetFrameInterval) return;
+      lastTwinFrameTime = now - (elapsedSinceLast % twinTargetFrameInterval);
+    }
+
     const delta = clock.getDelta();
     const time = clock.getElapsedTime();
 

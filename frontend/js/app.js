@@ -123,16 +123,19 @@ window.switchTab = function (tabId) {
     }, 50);
   } else if (tabId === 'tracking') {
     setTimeout(() => {
+      ensureTrajectoryMap();
       if (trajectoryMap) trajectoryMap.invalidateSize();
       runTrajectorySearch();
     }, 100);
   } else if (tabId === 'corridor') {
     setTimeout(() => {
+      ensureCorridorMap();
       if (corridorMap) corridorMap.invalidateSize();
       loadCorridorData();
     }, 100);
   } else if (tabId === 'macro') {
     setTimeout(() => {
+      ensureCityMap();
       if (cityMap) cityMap.invalidateSize();
       loadMacroTraffic();
     }, 100);
@@ -179,6 +182,8 @@ window.toggleMobileKPIs = function () {
 };
 
 // INITIAL DATA LOADING
+let cachedCameras = [];
+
 async function loadInitialDashboardData() {
   try {
     const [camsRes, macroRes] = await Promise.all([
@@ -187,8 +192,10 @@ async function loadInitialDashboardData() {
     ]);
 
     if (camsRes.ok) {
-      const cams = await camsRes.json();
-      populateCameraPins(cams);
+      cachedCameras = await camsRes.json();
+      if (cityMap) {
+        populateCameraPins(cachedCameras);
+      }
     }
 
     if (macroRes.ok) {
@@ -203,14 +210,12 @@ async function loadInitialDashboardData() {
 }
 
 // LEAFLET MAPS INITIALIZATION (Watermark-free, 100% free OSM with Cyber-Dark styling)
-function initLeafletMaps() {
-  if (typeof L === 'undefined') return;
+const kolkataCenter = [22.5726, 88.3639];
+const osmUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const osmAttr = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" class="text-cyan-400">OpenStreetMap</a> contributors';
 
-  const kolkataCenter = [22.5726, 88.3639];
-  const osmUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  const osmAttr = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" class="text-cyan-400">OpenStreetMap</a> contributors';
-
-  // 1. Macro City Map
+function ensureCityMap() {
+  if (cityMap || typeof L === 'undefined') return cityMap;
   const cityEl = document.getElementById('city-map');
   if (cityEl) {
     cityEl.classList.add('dark-map-tiles');
@@ -219,9 +224,15 @@ function initLeafletMaps() {
       maxZoom: 19,
       attribution: osmAttr
     }).addTo(cityMap);
+    if (cachedCameras && cachedCameras.length > 0) {
+      populateCameraPins(cachedCameras);
+    }
   }
+  return cityMap;
+}
 
-  // 2. Trajectory Map
+function ensureTrajectoryMap() {
+  if (trajectoryMap || typeof L === 'undefined') return trajectoryMap;
   const trajEl = document.getElementById('trajectory-map');
   if (trajEl) {
     trajEl.classList.add('dark-map-tiles');
@@ -231,10 +242,13 @@ function initLeafletMaps() {
       attribution: osmAttr
     }).addTo(trajectoryMap);
   }
+  return trajectoryMap;
+}
 
-  // 3. Green Corridor Map
+function ensureCorridorMap() {
+  if (corridorMap || typeof L === 'undefined') return corridorMap;
   const corrEl = document.getElementById('corridor-map');
-  if (corrEl && !corridorMap) {
+  if (corrEl) {
     corrEl.classList.add('dark-map-tiles');
     corridorMap = L.map('corridor-map', { zoomControl: true }).setView(kolkataCenter, 13);
     L.tileLayer(osmUrl, {
@@ -242,6 +256,14 @@ function initLeafletMaps() {
       attribution: osmAttr
     }).addTo(corridorMap);
   }
+  return corridorMap;
+}
+
+function initLeafletMaps() {
+  // Lazy init: only instantiate if the active tab requires it
+  if (currentTab === 'macro') ensureCityMap();
+  else if (currentTab === 'tracking') ensureTrajectoryMap();
+  else if (currentTab === 'corridor') ensureCorridorMap();
 }
 
 function createCustomPin(label, color = '#06b6d4') {

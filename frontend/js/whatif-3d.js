@@ -86,9 +86,9 @@
     updateCameraFromSpherical();
 
     // 3. Renderer with optimized Pixel Ratio
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
-    const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.0 : 1.25);
+    const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.0 : 1.1);
     renderer.setPixelRatio(dpr);
     renderer.shadowMap.enabled = false; // Disable expensive shadow map recalculation
     container.appendChild(renderer.domElement);
@@ -772,9 +772,20 @@
     }
   };
 
-  function animate() {
+  let lastFrameTime = 0;
+  const targetFrameInterval = 1000 / 60; // Strict 60 FPS cap
+
+  function animate(now) {
     if (!isWhatIfRunning) return;
     animFrameId = requestAnimationFrame(animate);
+
+    if (now && lastFrameTime) {
+      const elapsed = now - lastFrameTime;
+      if (elapsed < targetFrameInterval) return;
+      lastFrameTime = now - (elapsed % targetFrameInterval);
+    } else {
+      lastFrameTime = now || performance.now();
+    }
 
     const delta = clock.getDelta();
     const time = clock.getElapsedTime();
