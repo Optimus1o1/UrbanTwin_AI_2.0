@@ -428,6 +428,10 @@ class GreenCorridorRoute(BaseModel):
     vehicle: EmergencyVehicle
     origin_name: str
     destination_name: str
+    destination_lat: Optional[float] = None
+    destination_lng: Optional[float] = None
+    destination_coords: Optional[List[float]] = None
+    target_junction_id: Optional[str] = None
     total_distance_km: float
     eta_without_corridor_min: float
     eta_with_corridor_min: float
@@ -451,14 +455,14 @@ class GreenCorridorRoute(BaseModel):
 class CorridorDispatchRequest(BaseModel):
     scenario_preset: Optional[str] = None # trauma_cardiac, fire_4alarm, organ_transport
     callsign: Optional[str] = "AMB-911"
-    plate_number: Optional[str] = "KA-01-EA-9911"
+    plate_number: Optional[str] = "WB-02-EA-9911"
     license_plate: Optional[str] = None
     vehicle_type: EmergencyVehicleType = EmergencyVehicleType.AMBULANCE
     priority_level: Optional[str] = "CODE_RED"
     incident_type: str = "Severe Cardiac Arrest - STEMI"
-    origin_name: str = "Indiranagar 100ft Junction"
+    origin_name: str = "SSKM Hospital / IPGMER Emergency Bay"
     origin_coords: Optional[List[float]] = None
-    destination_name: str = "Victoria Emergency Trauma Hospital"
+    destination_name: str = "Apollo Multispecialty Hospital Apex Wing"
     destination_coords: Optional[List[float]] = None
     speed_kmh: float = 65.0
     auto_activate: Optional[bool] = False

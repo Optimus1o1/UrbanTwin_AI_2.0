@@ -1529,7 +1529,7 @@ function renderCorridorTelematics(c) {
   if (callsignEl) callsignEl.innerText = v.callsign || 'EMERGENCY UNIT';
 
   const plateEl = document.getElementById('corr-vehicle-plate');
-  if (plateEl) plateEl.innerText = v.plate_number || v.license_plate || 'KA-01-EMG';
+  if (plateEl) plateEl.innerText = v.plate_number || v.license_plate || 'WB-02-EA-9911';
 
   const priorityEl = document.getElementById('corr-priority-badge');
   if (priorityEl) priorityEl.innerText = (v.priority_level || 'CODE_RED').replace('_', ' ');
@@ -1619,17 +1619,22 @@ function renderSignalControllersRack(c) {
     }
 
     const heldStreets = (j.cross_streets_held || []).slice(0, 2).join(', ');
+    const isTarget = (c.target_junction_id && c.target_junction_id === j.junction_id) ||
+      (c.destination_name && (c.destination_name === j.junction_name || c.destination_name.includes(j.junction_name) || j.junction_name.includes(c.destination_name))) ||
+      (c.vehicle && c.vehicle.destination_name && (c.vehicle.destination_name === j.junction_name || c.vehicle.destination_name.includes(j.junction_name) || j.junction_name.includes(c.vehicle.destination_name))) ||
+      (!c.target_junction_id && idx === c.junctions.length - 1);
 
     return `
-      <div class="p-3 bg-slate-950/90 rounded-xl border ${isGreen ? 'border-emerald-500/50 shadow-lg shadow-emerald-950/40' : 'border-slate-800'} space-y-2 transition hover:border-slate-700">
+      <div class="p-3 bg-slate-950/90 rounded-xl border ${isTarget ? 'border-emerald-500 shadow-xl shadow-emerald-950/60 ring-1 ring-emerald-500/40' : (isGreen ? 'border-emerald-500/50 shadow-lg shadow-emerald-950/40' : 'border-slate-800')} space-y-2 transition hover:border-slate-700">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-2">
-            <div class="w-6 h-6 rounded-lg ${isGreen ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-gray-400'} flex items-center justify-center text-[10px] font-bold font-mono border border-slate-700">
+            <div class="w-6 h-6 rounded-lg ${isTarget ? 'bg-emerald-500 text-black font-extrabold' : (isGreen ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-gray-400')} flex items-center justify-center text-[10px] font-bold font-mono border border-slate-700">
               #${idx + 1}
             </div>
             <div>
-              <div class="text-white font-bold text-xs flex items-center space-x-1.5">
+              <div class="text-white font-bold text-xs flex items-center space-x-1.5 flex-wrap gap-1">
                 <span>${j.junction_name}</span>
+                ${isTarget ? '<span class="bg-emerald-500 text-black font-bold px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">ACTIVE TARGET</span>' : ''}
                 ${j.manual_override ? '<span class="px-1.5 py-0.2 bg-purple-950 text-purple-300 text-[9px] rounded border border-purple-500/40">OVERRIDE</span>' : ''}
               </div>
               <div class="text-[10px] text-gray-400 font-mono">${j.junction_id} • ${distM}m downstream</div>
@@ -1940,9 +1945,24 @@ window.overrideSignal = async function (junctionId, action) {
     if (res.ok) {
       const data = await res.json();
       currentCorridorData = data;
+      renderCorridorTelematics(data);
       renderSignalControllersRack(data);
       renderCorridorOnMap(data);
-      showCorridorToast(`Signal ${junctionId} override applied: ${action}`);
+
+      const coords3D = data.route_3d_coordinates || data.waypoints_3d;
+      if (window.show3DGreenCorridor && coords3D && coords3D.length > 0) {
+        const vCoords3D = data.current_step_index !== undefined && coords3D[data.current_step_index] 
+          ? coords3D[data.current_step_index] 
+          : coords3D[0];
+        window.show3DGreenCorridor(coords3D, vCoords3D);
+      }
+
+      if (action === 'FORCE_GREEN') {
+        const targetName = data.destination_name || junctionId;
+        showCorridorToast(`🚑 Green wave preemption locked to ${targetName}. Route updated.`);
+      } else {
+        showCorridorToast(`Signal ${junctionId} override applied: ${action}`);
+      }
     }
   } catch (e) {
     console.error("Override signal error:", e);
@@ -1986,8 +2006,8 @@ window.submitCustomDispatch = async function () {
   const payload = {
     vehicle_id: `VEH-CUSTOM-${Math.floor(Math.random() * 900 + 100)}`,
     callsign: callsign || 'EMG-UNIT-ALPHA',
-    plate_number: plate || 'KA-01-XX-0001',
-    license_plate: plate || 'KA-01-XX-0001',
+    plate_number: plate || 'WB-02-XX-0001',
+    license_plate: plate || 'WB-02-XX-0001',
     vehicle_type: vtype,
     priority_level: 'CODE_RED',
     incident_type: incident || 'Emergency Intervention',

@@ -34,7 +34,10 @@ JUNCTION_ALIASES = {
     "JNC_MG_ROAD_TRINITY": "JUNC-03",
     "JUNC-03": "JUNC-03",
     "JNC_VICTORIA_TRAUMA": "JUNC-04",
-    "JUNC-04": "JUNC-04"
+    "JUNC-04": "JUNC-04",
+    "JUNC-05": "JUNC-05",
+    "JUNC-06": "JUNC-06",
+    "JUNC-07": "JUNC-07"
 }
 
 # City Junction Topology Database with Geographic & 3D WebGL Coordinates
@@ -226,8 +229,9 @@ def _init_default_scenarios():
     if CORRIDORS_DB:
         return
 
-    # Scenario 1: Code-Red Cardiac Life Support Ambulance Run
-    route1_juncs = [JUNCTIONS_CONFIG[0], JUNCTIONS_CONFIG[1], JUNCTIONS_CONFIG[2], JUNCTIONS_CONFIG[3]]
+    # Scenario 1: Code-Red Cardiac Life Support Ambulance Run (SSKM to Apollo)
+    # JUNC-01 is origin (SSKM Trauma Center Gate); JUNC-02..07 are 6 downstream destinations
+    route1_juncs = [j for j in JUNCTIONS_CONFIG if j["id"] != "JUNC-01"]
     gis1, coords3d_1 = _generate_dense_interpolated_path(route1_juncs, corridor_id="CORRIDOR-ALS-911")
     dist1 = sum(haversine_distance_km(gis1[k][0], gis1[k][1], gis1[k+1][0], gis1[k+1][1]) for k in range(len(gis1)-1))
     eta_no_corr1 = round((dist1 / 22.0) * 60.0, 1) # Normal city crawl (22 km/h)
@@ -245,9 +249,9 @@ def _init_default_scenarios():
             priority_level="CODE_RED",
             incident_type="Severe STEMI Cardiac Arrest & Respiratory Distress",
             current_location_name="SSKM Hospital Emergency Bay",
-            current_lat=route1_juncs[0]["lat"],
-            current_lng=route1_juncs[0]["lng"],
-            current_coords=[route1_juncs[0]["lat"], route1_juncs[0]["lng"]],
+            current_lat=JUNCTIONS_CONFIG[0]["lat"],
+            current_lng=JUNCTIONS_CONFIG[0]["lng"],
+            current_coords=[JUNCTIONS_CONFIG[0]["lat"], JUNCTIONS_CONFIG[0]["lng"]],
             current_speed_kmh=64.5,
             heading_deg=65.0,
             destination_name="Apollo Multispecialty Hospital Apex Wing",
@@ -260,6 +264,10 @@ def _init_default_scenarios():
         ),
         origin_name="SSKM Hospital / IPGMER Emergency Bay",
         destination_name="Apollo Multispecialty Hospital Apex Wing",
+        destination_lat=route1_juncs[-1]["lat"],
+        destination_lng=route1_juncs[-1]["lng"],
+        destination_coords=[route1_juncs[-1]["lat"], route1_juncs[-1]["lng"]],
+        target_junction_id=route1_juncs[-1]["id"],
         total_distance_km=round(dist1, 2),
         eta_without_corridor_min=eta_no_corr1,
         eta_with_corridor_min=eta_with_corr1,
@@ -444,7 +452,7 @@ def dispatch_emergency_corridor(req: CorridorDispatchRequest) -> GreenCorridorRo
     eta_base = round((total_dist / 22.0) * 60.0, 1)
     eta_cleared = round((total_dist / max(45.0, req.speed_kmh)) * 60.0, 1)
 
-    plate = req.plate_number or req.license_plate or "KA-01-XX-0000"
+    plate = req.plate_number or req.license_plate or "WB-02-XX-0000"
     callsign = req.callsign or "EMERGENCY-DISPATCH"
     priority = req.priority_level or "CODE_RED"
     vehicle = EmergencyVehicle(
@@ -566,31 +574,140 @@ def override_junction_signal(corridor_id: str, req: SignalOverrideRequest) -> Op
     target_junc = req.junction_id.upper()
     mapped_junc = JUNCTION_ALIASES.get(target_junc, target_junc)
 
-    for j in corridor.junctions:
-        if j.junction_id.upper() in [target_junc, mapped_junc] or target_junc in j.junction_name.upper():
-            j.manual_override = True
-            if action in ["FORCE_GREEN"]:
-                j.signal_state = SignalPreemptionState.PREEMPTED_GREEN
-                j.preemption_active = True
-                j.cross_street_hold = True
-                j.queue_cleared_pct = 100.0
-                j.queue_clearance_percent = 100.0
-                j.queue_clearance_pct = 100.0
-                j.green_lock_countdown_sec = 0
-                j.time_to_green_lock = 0
-                j.green_window_duration_seconds = 0
-            elif action in ["EXTEND_30S", "ADD_BUFFER_30S"]:
-                j.signal_state = SignalPreemptionState.PREEMPTED_GREEN
-                j.preemption_active = True
-                j.cross_street_hold = True
-                j.green_lock_countdown_sec += duration
-                j.time_to_green_lock += duration
-                j.green_window_duration_seconds = j.green_lock_countdown_sec
-            elif action in ["CLEAR_NORMAL", "RELEASE_HOLD"]:
-                j.signal_state = SignalPreemptionState.NORMAL_CYCLE
-                j.preemption_active = False
-                j.cross_street_hold = False
-                j.manual_override = False
+    if action in ["FORCE_GREEN"]:
+        # Find target junction in corridor.junctions or fallback to JUNCTIONS_CONFIG
+        target_idx = -1
+        target_junc_obj = None
+        for idx, j in enumerate(corridor.junctions):
+            if j.junction_id.upper() in [target_junc, mapped_junc] or target_junc in j.junction_name.upper():
+                target_idx = idx
+                target_junc_obj = j
+                break
+
+        if target_junc_obj is not None:
+            # Update destination facility name & coordinates
+            corridor.destination_name = target_junc_obj.junction_name
+            corridor.destination_lat = target_junc_obj.lat
+            corridor.destination_lng = target_junc_obj.lng
+            corridor.destination_coords = [target_junc_obj.lat, target_junc_obj.lng]
+            corridor.target_junction_id = target_junc_obj.junction_id
+
+            corridor.vehicle.destination_name = target_junc_obj.junction_name
+            corridor.vehicle.destination_lat = target_junc_obj.lat
+            corridor.vehicle.destination_lng = target_junc_obj.lng
+            corridor.vehicle.destination_coords = [target_junc_obj.lat, target_junc_obj.lng]
+            corridor.vehicle.assigned_hospital_or_station = target_junc_obj.junction_name
+
+            # Retrieve full corridor road polyline from road_network
+            full_path = get_corridor_road_path(corridor.corridor_id)
+            if not full_path or len(full_path) < 2:
+                full_path = get_corridor_road_path(resolved)
+            if not full_path or len(full_path) < 2:
+                full_path = corridor.route_coordinates
+
+            # Find closest road vertex to the selected junction coordinates
+            best_idx = 0
+            best_dist = float("inf")
+            for i, pt in enumerate(full_path):
+                d_sq = (pt[0] - target_junc_obj.lat) ** 2 + (pt[1] - target_junc_obj.lng) ** 2
+                if d_sq < best_dist:
+                    best_dist = d_sq
+                    best_idx = i
+
+            # Slice route from origin up to that junction vertex
+            if target_idx == len(corridor.junctions) - 1:
+                sliced_coords = [list(pt) for pt in full_path]
+            else:
+                sliced_coords = [list(pt) for pt in full_path[:max(2, best_idx + 1)]]
+
+            # Snap terminal vertex exactly to destination junction coordinates
+            sliced_coords[-1] = [round(target_junc_obj.lat, 6), round(target_junc_obj.lng, 6)]
+
+            # Generate corresponding 3D coordinates via map_gis_to_3d_coordinates
+            coords_3d = map_gis_to_3d_coordinates(sliced_coords)
+            corridor.route_coordinates = sliced_coords
+            corridor.gis_polyline = sliced_coords
+            corridor.route_3d_coordinates = coords_3d
+            corridor.waypoints_3d = coords_3d
+            corridor.current_step_index = 0
+
+            # Set all junctions up to and including target junction to PREEMPTED_GREEN
+            # Release signals downstream of the selected destination to NORMAL_CYCLE
+            for idx, j in enumerate(corridor.junctions):
+                if idx <= target_idx:
+                    j.manual_override = True
+                    j.signal_state = SignalPreemptionState.PREEMPTED_GREEN
+                    j.preemption_active = True
+                    j.cross_street_hold = True
+                    j.queue_cleared_pct = 100.0
+                    j.queue_clearance_percent = 100.0
+                    j.queue_clearance_pct = 100.0
+                    j.green_lock_countdown_sec = 0
+                    j.time_to_green_lock = 0
+                    j.green_window_duration_seconds = 0
+                else:
+                    j.manual_override = False
+                    j.signal_state = SignalPreemptionState.NORMAL_CYCLE
+                    j.preemption_active = False
+                    j.cross_street_hold = False
+                    j.queue_cleared_pct = 0.0
+                    j.queue_clearance_percent = 0.0
+                    j.queue_clearance_pct = 0.0
+
+            # Recalculate remaining distance, ETA, and time saved for the new route
+            total_dist = sum(
+                haversine_distance_km(
+                    sliced_coords[k][0], sliced_coords[k][1],
+                    sliced_coords[k+1][0], sliced_coords[k+1][1]
+                ) for k in range(len(sliced_coords) - 1)
+            )
+            speed = max(45.0, corridor.vehicle.current_speed_kmh)
+            eta_base = round((total_dist / 22.0) * 60.0, 1) # Normal city crawl (22 km/h)
+            eta_cleared = round((total_dist / speed) * 60.0, 1) # Green wave express
+            time_saved = round(max(0.5, eta_base - eta_cleared), 1)
+
+            corridor.total_distance_km = round(total_dist, 2)
+            corridor.eta_without_corridor_min = eta_base
+            corridor.eta_normal_minutes = eta_base
+            corridor.eta_with_corridor_min = eta_cleared
+            corridor.eta_corridor_minutes = eta_cleared
+            corridor.time_saved_min = time_saved
+            corridor.time_saved_minutes = time_saved
+            corridor.vehicle.eta_seconds = int(eta_cleared * 60)
+
+            # Update junction distances and ETAs
+            cum_m = 0.0
+            for i, j in enumerate(corridor.junctions):
+                if i == 0:
+                    step_m = haversine_distance_km(corridor.vehicle.current_lat, corridor.vehicle.current_lng, j.lat, j.lng) * 1000.0
+                else:
+                    prev = corridor.junctions[i - 1]
+                    step_m = haversine_distance_km(prev.lat, prev.lng, j.lat, j.lng) * 1000.0
+                cum_m += max(200.0, step_m)
+                j.distance_meters = round(cum_m, 1)
+                j.distance_to_junction_meters = round(cum_m, 1)
+                speed_mps = speed * 1000.0 / 3600.0
+                j_eta = max(5, int(cum_m / speed_mps))
+                j.eta_seconds = j_eta
+                j.estimated_arrival_seconds = j_eta
+
+    else:
+        # Non-FORCE_GREEN actions (EXTEND_30S, CLEAR_NORMAL, etc.)
+        for j in corridor.junctions:
+            if j.junction_id.upper() in [target_junc, mapped_junc] or target_junc in j.junction_name.upper():
+                j.manual_override = True
+                if action in ["EXTEND_30S", "ADD_BUFFER_30S"]:
+                    j.signal_state = SignalPreemptionState.PREEMPTED_GREEN
+                    j.preemption_active = True
+                    j.cross_street_hold = True
+                    j.green_lock_countdown_sec += duration
+                    j.time_to_green_lock += duration
+                    j.green_window_duration_seconds = j.green_lock_countdown_sec
+                elif action in ["CLEAR_NORMAL", "RELEASE_HOLD"]:
+                    j.signal_state = SignalPreemptionState.NORMAL_CYCLE
+                    j.preemption_active = False
+                    j.cross_street_hold = False
+                    j.manual_override = False
 
     corridor.updated_at = datetime.now(timezone.utc).isoformat()
     return corridor

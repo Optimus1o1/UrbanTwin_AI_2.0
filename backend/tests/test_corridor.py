@@ -77,16 +77,70 @@ def test_simulate_step_progress():
 def test_signal_override():
     """Verify manual operator signal overrides."""
     override_payload = {
-        "junction_id": "JUNC-01",
+        "junction_id": "JUNC-02",
         "action": "EXTEND_30S",
         "reason": "Ambulance delayed by road obstacle"
     }
     res = client.post("/api/v1/corridors/CORRIDOR-ALS-911/signal-override", json=override_payload)
     assert res.status_code == 200
     data = res.json()
-    junc = next((j for j in data["junctions"] if j["junction_id"] == "JUNC-01"), None)
+    junc = next((j for j in data["junctions"] if j["junction_id"] == "JUNC-02"), None)
     assert junc is not None
     assert junc["green_lock_countdown_sec"] >= 30
+
+def test_force_green_retargets_destination_and_route():
+    """Verify that FORCE_GREEN on a downstream junction dynamically retargets route, destination, and preemption."""
+    # Retarget to Beckbagan (JUNC-03)
+    override_payload = {
+        "junction_id": "JUNC-03",
+        "action": "FORCE_GREEN"
+    }
+    res = client.post("/api/v1/corridors/CORRIDOR-ALS-911/signal-override", json=override_payload)
+    assert res.status_code == 200
+    data = res.json()
+
+    # Destination name updated
+    assert "Beckbagan" in data["destination_name"]
+    assert "Beckbagan" in data["vehicle"]["destination_name"]
+
+    # Route coordinates terminate at JUNC-03
+    last_pt = data["route_coordinates"][-1]
+    junc3 = next(j for j in data["junctions"] if j["junction_id"] == "JUNC-03")
+    assert abs(last_pt[0] - junc3["lat"]) < 0.001
+    assert abs(last_pt[1] - junc3["lng"]) < 0.001
+
+    # Signal states up to target are PREEMPTED_GREEN, and downstream are NORMAL_CYCLE
+    passed_target = False
+    for j in data["junctions"]:
+        if not passed_target:
+            assert j["signal_state"] == SignalPreemptionState.PREEMPTED_GREEN.value
+            assert j["cross_street_hold"] is True
+            assert j["queue_cleared_pct"] == 100.0
+        else:
+            assert j["signal_state"] == SignalPreemptionState.NORMAL_CYCLE.value
+            assert j["cross_street_hold"] is False
+        if j["junction_id"] == "JUNC-03":
+            passed_target = True
+
+    # Retarget further to Science City (JUNC-06)
+    res_sc = client.post("/api/v1/corridors/CORRIDOR-ALS-911/signal-override", json={
+        "junction_id": "JUNC-06",
+        "action": "FORCE_GREEN"
+    })
+    assert res_sc.status_code == 200
+    data_sc = res_sc.json()
+    assert "Science City" in data_sc["destination_name"]
+    assert len(data_sc["route_coordinates"]) > len(data["route_coordinates"])
+
+    # Restore full corridor to Apollo Hospital (JUNC-07)
+    res_apollo = client.post("/api/v1/corridors/CORRIDOR-ALS-911/signal-override", json={
+        "junction_id": "JUNC-07",
+        "action": "FORCE_GREEN"
+    })
+    assert res_apollo.status_code == 200
+    data_apollo = res_apollo.json()
+    assert "Apollo" in data_apollo["destination_name"]
+    assert len(data_apollo["route_coordinates"]) >= len(data_sc["route_coordinates"])
 
 def test_deactivate_corridor():
     """Verify corridor deactivation and transition recovery."""
