@@ -354,6 +354,15 @@ class LiveVehicleRecognitionEngine:
         # SSDLite cache to allow running deep detection every 2-3 frames smoothly
         self.cached_detections: List[Dict[str, Any]] = []
 
+    def shutdown(self):
+        try:
+            self.ocr_executor.shutdown(wait=False, cancel_futures=True)
+        except Exception:
+            pass
+
+    def __del__(self):
+        self.shutdown()
+
     def extract_dominant_color(self, crop: np.ndarray) -> Tuple[str, str]:
         """
         Extracts dominant vehicle body color from central region of crop.
@@ -1184,6 +1193,8 @@ class CameraStreamWorker:
 
     def stop(self):
         self.is_running = False
+        if hasattr(self, "recognition_engine"):
+            self.recognition_engine.shutdown()
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=1.0)
 
