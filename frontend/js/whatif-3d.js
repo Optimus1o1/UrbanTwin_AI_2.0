@@ -78,8 +78,8 @@
 
     // 1. Scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x040814);
-    scene.fog = new THREE.FogExp2(0x040814, 0.012);
+    scene.background = new THREE.Color(0x000000);
+    scene.fog = new THREE.FogExp2(0x000000, 0.012);
 
     // 2. Camera
     camera = new THREE.PerspectiveCamera(45, width / height, 1, 1000);
@@ -97,15 +97,15 @@
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2(-999, -999);
 
-    // 5. Lighting
-    const ambient = new THREE.AmbientLight(0xdcf8ff, 0.9);
+    // 5. Lighting (Monochrome)
+    const ambient = new THREE.AmbientLight(0xffffff, 0.85);
     scene.add(ambient);
 
-    const dirLight1 = new THREE.DirectionalLight(0x38bdf8, 1.2);
+    const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.0);
     dirLight1.position.set(40, 60, 30);
     scene.add(dirLight1);
 
-    const dirLight2 = new THREE.DirectionalLight(0xa855f7, 0.8);
+    const dirLight2 = new THREE.DirectionalLight(0xaaaaaa, 0.6);
     dirLight2.position.set(-40, 40, -30);
     scene.add(dirLight2);
 
@@ -147,16 +147,16 @@
   // ENVIRONMENT MESHES
   // =========================================================================
   function buildHologramGridFloor() {
-    const grid = new THREE.GridHelper(140, 40, 0x06b6d4, 0x1e293b);
+    const grid = new THREE.GridHelper(140, 40, 0x444444, 0x181818);
     grid.position.y = -0.05;
     scene.add(grid);
 
     // Radial dark ground ring
     const groundGeo = new THREE.CircleGeometry(75, 48);
     const groundMat = new THREE.MeshBasicMaterial({
-      color: 0x02040a,
+      color: 0x000000,
       transparent: true,
-      opacity: 0.85
+      opacity: 0.95
     });
     const groundMesh = new THREE.Mesh(groundGeo, groundMat);
     groundMesh.rotation.x = -Math.PI / 2;
@@ -186,12 +186,12 @@
     buildingCoords.forEach(b => {
       const geo = new THREE.BoxGeometry(b.w, b.h, b.d);
       const mat = new THREE.MeshStandardMaterial({
-        color: 0x0f172a,
-        emissive: 0x0284c7,
-        emissiveIntensity: 0.15,
+        color: 0x121212,
+        emissive: 0x242424,
+        emissiveIntensity: 0.1,
         transparent: true,
-        opacity: 0.35,
-        roughness: 0.2,
+        opacity: 0.45,
+        roughness: 0.3,
         metalness: 0.8
       });
       const mesh = new THREE.Mesh(geo, mat);
@@ -199,7 +199,7 @@
 
       // Wireframe contour
       const edges = new THREE.EdgesGeometry(geo);
-      const lineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.4 });
+      const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 });
       const wire = new THREE.LineSegments(edges, lineMat);
       mesh.add(wire);
 

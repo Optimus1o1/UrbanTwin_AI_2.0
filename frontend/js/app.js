@@ -58,8 +58,8 @@ window.switchTab = function (tabId) {
   if (window.playAudioCue) window.playAudioCue('tab');
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.classList.remove('text-white', 'bg-cyan-600/30', 'border-cyan-500/40');
-    btn.classList.add('text-slate-400');
+    btn.classList.remove('text-white', 'bg-white/15', 'border-white/30', 'shadow-[0_0_15px_rgba(255,255,255,0.08)]', 'bg-cyan-600/30', 'border-cyan-500/40');
+    btn.classList.add('text-zinc-400', 'border-transparent');
   });
 
   const activePanel = document.getElementById(`tab-${tabId}`);
@@ -67,14 +67,14 @@ window.switchTab = function (tabId) {
 
   const activeBtn = document.getElementById(`nav-${tabId}`);
   if (activeBtn) {
-    activeBtn.classList.remove('text-slate-400');
-    activeBtn.classList.add('text-white', 'bg-cyan-600/30', 'border-cyan-500/40');
+    activeBtn.classList.remove('text-zinc-400', 'text-slate-400', 'border-transparent');
+    activeBtn.classList.add('text-white', 'bg-white/15', 'border-white/30', 'shadow-[0_0_15px_rgba(255,255,255,0.08)]');
   }
 
   const activeMobileBtn = document.getElementById(`mobile-nav-${tabId}`);
   if (activeMobileBtn) {
-    activeMobileBtn.classList.remove('text-slate-400');
-    activeMobileBtn.classList.add('text-white', 'bg-cyan-600/30', 'border-cyan-500/40');
+    activeMobileBtn.classList.remove('text-zinc-400', 'text-slate-400', 'border-transparent');
+    activeMobileBtn.classList.add('text-white', 'bg-white/15', 'border-white/30');
     try {
       activeMobileBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     } catch (_) {}
@@ -82,15 +82,15 @@ window.switchTab = function (tabId) {
 
   // Synchronize Mobile Bottom Navigation Bar
   document.querySelectorAll('.bottom-nav-btn').forEach(btn => {
-    btn.classList.remove('text-cyan-400', 'bg-cyan-500/15', 'border-cyan-500/40');
-    btn.classList.add('text-slate-400');
+    btn.classList.remove('text-white', 'bg-white/15', 'border-white/25', 'text-cyan-400', 'bg-cyan-500/15', 'border-cyan-500/40');
+    btn.classList.add('text-zinc-400');
     const dot = btn.querySelector('.active-dot');
     if (dot) dot.classList.add('hidden');
   });
   const activeBottomBtn = document.getElementById(`bottom-nav-${tabId}`);
   if (activeBottomBtn) {
-    activeBottomBtn.classList.remove('text-slate-400');
-    activeBottomBtn.classList.add('text-cyan-400', 'bg-cyan-500/15', 'border-cyan-500/40');
+    activeBottomBtn.classList.remove('text-zinc-400', 'text-slate-400');
+    activeBottomBtn.classList.add('text-white', 'bg-white/15', 'border-white/25');
     const dot = activeBottomBtn.querySelector('.active-dot');
     if (dot) dot.classList.remove('hidden');
     try {
@@ -363,12 +363,12 @@ function renderTrajectory(traj) {
     trajMarkers = [];
     if (animVehicleMarker) trajectoryMap.removeLayer(animVehicleMarker);
 
-    // Draw route polyline with cyan neon glow
+    // Draw route polyline with crisp white GIS track
     trajPolyline = L.polyline(traj.route_coordinates, {
-      color: '#06b6d4',
-      weight: 5,
-      opacity: 0.85,
-      dashArray: '8, 8'
+      color: '#FFFFFF',
+      weight: 4,
+      opacity: 0.95,
+      dashArray: '6, 6'
     }).addTo(trajectoryMap);
 
     // Add numbered waypoint markers (1, 2, 3...)
@@ -803,10 +803,10 @@ window.highlightODCorridor = function (originName, destName) {
   if (originNode && destNode) {
     const pts = [[originNode.latitude, originNode.longitude], [destNode.latitude, destNode.longitude]];
     activeHighlightedCorridor = L.polyline(pts, {
-      color: '#00f0ff',
-      weight: 8,
+      color: '#FFFFFF',
+      weight: 6,
       opacity: 0.95,
-      dashArray: '12, 12'
+      dashArray: '8, 8'
     }).addTo(cityMap);
 
     cityMap.fitBounds(activeHighlightedCorridor.getBounds(), { padding: [60, 60] });
@@ -816,10 +816,10 @@ window.highlightODCorridor = function (originName, destName) {
     if (!toast) {
       toast = document.createElement('div');
       toast.id = 'od-corridor-toast';
-      toast.className = 'fixed top-20 right-8 z-50 p-3 bg-slate-950/95 border border-cyan-400 rounded-xl text-xs shadow-2xl text-cyan-300 font-mono flex items-center space-x-2 animate-fade-in';
+      toast.className = 'fixed top-20 right-8 z-50 p-3 bg-black/90 border border-white/20 rounded-xl text-xs shadow-2xl text-white font-mono flex items-center space-x-2 animate-fade-in backdrop-blur-xl';
       document.body.appendChild(toast);
     }
-    toast.innerHTML = `<i class="fa-solid fa-arrows-split-up-and-left text-cyan-400"></i><span>Active Corridor: ${originName} • ${destName}</span>`;
+    toast.innerHTML = `<i class="fa-solid fa-arrows-split-up-and-left text-zinc-300"></i><span>Active Corridor: ${originName} • ${destName}</span>`;
     setTimeout(() => { toast.remove(); }, 3500);
   }
 };
@@ -889,13 +889,13 @@ async function loadAlerts() {
       const tbody = document.getElementById('blacklist-table-body');
       if (tbody) {
         tbody.innerHTML = registry.map(item => `
-          <tr class="hover:bg-slate-900/60 transition">
-            <td class="p-3 font-mono font-bold text-cyan-300">${item.plate_text}</td>
+          <tr class="hover:bg-white/5 transition">
+            <td class="p-3 font-mono font-bold text-white tracking-wider">${item.plate_text}</td>
             <td class="p-3 text-white font-medium">${item.vehicle_desc}</td>
-            <td class="p-3 text-gray-300">${item.reason}</td>
-            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${item.severity === 'CRITICAL' ? 'bg-rose-950 text-rose-400 border border-rose-500/40' : 'bg-amber-950 text-amber-400 border border-amber-500/40'}">${item.severity}</span></td>
-            <td class="p-3 font-mono text-gray-400">${item.warrant_id}</td>
-            <td class="p-3 text-gray-300">${item.registered_owner}</td>
+            <td class="p-3 text-zinc-300">${item.reason}</td>
+            <td class="p-3"><span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-white/10 text-white border border-white/20">${item.severity}</span></td>
+            <td class="p-3 font-mono text-zinc-400">${item.warrant_id}</td>
+            <td class="p-3 text-zinc-300">${item.registered_owner}</td>
           </tr>
         `).join('');
       }
@@ -980,9 +980,9 @@ window.filterRadarThreats = function (filterType) {
     const btn = document.getElementById(btnInfo.id);
     if (btn) {
       if (btnInfo.type === filterType) {
-        btn.className = 'px-3 py-1 rounded bg-cyan-600 text-white font-bold transition';
+        btn.className = 'px-3 py-1 rounded-full bg-white text-black font-semibold transition text-xs shadow-sm';
       } else {
-        btn.className = 'px-3 py-1 rounded text-slate-400 hover:text-white transition';
+        btn.className = 'px-3 py-1 rounded-full text-zinc-400 hover:text-white transition text-xs';
       }
     }
   });
@@ -1003,78 +1003,78 @@ function renderRadarThreatCards() {
   if (countEl) countEl.innerText = `${filtered.length} Active Outliers`;
 
   if (filtered.length === 0) {
-    container.innerHTML = '<div class="p-4 bg-slate-950/80 rounded-xl border border-slate-800 text-center text-xs text-gray-400 font-mono">No active threats matching selected filter.</div>';
+    container.innerHTML = '<div class="p-5 bg-white/[0.02] rounded-xl border border-white/10 text-center text-xs text-zinc-400 font-mono">No active threats matching selected filter.</div>';
     return;
   }
 
   container.innerHTML = filtered.map(t => {
-    let typeBadge = 'bg-rose-950/80 text-rose-400 border-rose-500/40';
+    let typeBadge = 'bg-white/10 text-white border-white/20';
     let typeIcon = 'fa-clone';
     let typeName = 'Plate Cloning Fraud';
 
     if (t.threat_type === 'TACTICAL_CONVOY') {
-      typeBadge = 'bg-amber-950/80 text-amber-400 border-amber-500/40';
+      typeBadge = 'bg-white/10 text-white border-white/20';
       typeIcon = 'fa-truck-moving';
       typeName = 'Tactical Convoy Formation';
     } else if (t.threat_type === 'SURVEILLANCE_LOITERING') {
-      typeBadge = 'bg-purple-950/80 text-purple-400 border-purple-500/40';
+      typeBadge = 'bg-white/10 text-white border-white/20';
       typeIcon = 'fa-arrows-spin';
       typeName = 'Surveillance Loitering Vector';
     }
 
     return `
-      <div id="threat-card-${t.threat_id}" class="p-4 bg-slate-950/90 rounded-xl border border-slate-800 hover:border-cyan-500/40 transition space-y-2.5 shadow-xl">
+      <div id="threat-card-${t.threat_id}" class="p-4 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10 hover:border-white/25 transition space-y-2.5 shadow-xl">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div class="flex items-center space-x-2">
-            <span class="px-2 py-0.5 rounded border text-[10px] font-bold font-mono ${typeBadge} flex items-center space-x-1">
-              <i class="fa-solid ${typeIcon} mr-1"></i>${typeName}
+            <span class="px-2.5 py-0.5 rounded-full border text-[10px] font-semibold font-mono ${typeBadge} flex items-center space-x-1.5">
+              <i class="fa-solid ${typeIcon} text-[9px]"></i><span>${typeName}</span>
             </span>
-            <span class="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-[10px] font-mono font-bold text-gray-300">${t.severity}</span>
+            <span class="px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-[10px] font-mono font-bold text-white">${t.severity}</span>
           </div>
           <div class="flex items-center space-x-2 font-mono text-xs">
-            <span class="px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 font-bold">
+            <span class="px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-white font-bold">
               Z-Score: +${t.evidence.anomaly_z_score}σ
             </span>
-            <span class="text-[11px] text-gray-400">${t.detection_timestamp}</span>
+            <span class="text-[11px] text-zinc-400">${t.detection_timestamp}</span>
           </div>
         </div>
 
         <div class="flex flex-wrap items-baseline justify-between gap-2">
           <div class="flex items-center space-x-2">
-            <span class="font-mono text-base font-bold text-white bg-slate-900 px-2.5 py-0.5 rounded border border-slate-700">${t.primary_plate}</span>
-            ${t.secondary_plate ? `<span class="text-xs text-gray-400">• Coupled With:</span><span class="font-mono text-xs font-bold text-amber-300 bg-amber-950/50 px-2 py-0.5 rounded border border-amber-500/40">${t.secondary_plate}</span>` : ''}
+            <span class="font-mono text-base font-bold text-white bg-black/80 px-2.5 py-0.5 rounded border border-white/20 tracking-wider">${t.primary_plate}</span>
+            ${t.secondary_plate ? `<span class="text-xs text-zinc-400">• Coupled:</span><span class="font-mono text-xs font-bold text-white bg-white/10 px-2 py-0.5 rounded border border-white/20">${t.secondary_plate}</span>` : ''}
           </div>
-          <span class="text-xs text-gray-300 font-medium">${t.primary_vehicle_desc}</span>
+          <span class="text-xs text-zinc-300 font-medium">${t.primary_vehicle_desc}</span>
         </div>
 
         <!-- Mathematical Evidence Box -->
-        <div class="p-2.5 bg-slate-900/80 rounded-lg border border-slate-800 text-[11px] font-mono space-y-1">
-          <div class="flex justify-between text-cyan-400 font-bold">
+        <div class="p-2.5 bg-black/60 rounded-lg border border-white/10 text-[11px] font-mono space-y-1">
+          <div class="flex justify-between text-white font-semibold">
             <span>Evidence: ${t.evidence.metric_name}</span>
-            <span class="text-emerald-400">${Math.round(t.evidence.model_confidence * 100)}% Confidence</span>
+            <span class="text-zinc-300">${Math.round(t.evidence.model_confidence * 100)}% Confidence</span>
           </div>
-          <div class="text-slate-200">${t.evidence.physical_discrepancy}</div>
-          <div class="text-gray-400 pt-0.5 flex flex-wrap gap-x-4">
-            <span>Observed: <strong class="text-rose-400">${t.evidence.observed_value}</strong></span>
-            <span>Limit: <strong class="text-gray-300">${t.evidence.baseline_threshold}</strong></span>
+          <div class="text-zinc-200">${t.evidence.physical_discrepancy}</div>
+          <div class="text-zinc-400 pt-0.5 flex flex-wrap gap-x-4">
+            <span>Observed: <strong class="text-white">${t.evidence.observed_value}</strong></span>
+            <span>Limit: <strong class="text-zinc-400">${t.evidence.baseline_threshold}</strong></span>
           </div>
         </div>
 
         <!-- Camera Trajectory Nodes -->
-        <div class="flex flex-wrap items-center justify-between text-[11px] pt-1 text-gray-400 font-mono">
-          <div class="flex items-center space-x-1">
-            <i class="fa-solid fa-camera text-cyan-400 mr-1"></i>
+        <div class="flex flex-wrap items-center justify-between text-[11px] pt-1 text-zinc-400 font-mono">
+          <div class="flex items-center space-x-1.5">
+            <i class="fa-solid fa-camera text-white/80"></i>
             <span>Nodes: ${t.camera_names.join(' &rarr; ')}</span>
           </div>
-          <span class="text-slate-400">Sector: ${t.sector}</span>
+          <span class="text-zinc-400">Sector: ${t.sector}</span>
         </div>
 
         <!-- Recommended Action & Intercept Button -->
-        <div class="flex items-center justify-between pt-2 border-t border-slate-800/80">
-          <p class="text-[11px] text-rose-300 font-medium italic truncate max-w-[70%]">
-            <i class="fa-solid fa-shield-halved mr-1"></i>${t.suggested_action}
+        <div class="flex items-center justify-between pt-2 border-t border-white/10">
+          <p class="text-[11px] text-zinc-300 font-medium italic truncate max-w-[70%]">
+            <i class="fa-solid fa-shield-halved mr-1 text-white/80"></i>${t.suggested_action}
           </p>
-          <button onclick="window.dispatchRadarIntercept('${t.threat_id}')" class="px-3 py-1 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white rounded text-[11px] font-bold font-mono transition flex items-center space-x-1 shadow-md">
+          <button onclick="window.dispatchRadarIntercept('${t.threat_id}')" class="px-3 py-1.5 bg-white text-black hover:bg-zinc-200 rounded-lg text-[11px] font-semibold font-mono transition flex items-center space-x-1.5 shadow-sm">
             <i class="fa-solid fa-crosshairs"></i>
             <span>Dispatch Intercept</span>
           </button>
@@ -1126,21 +1126,21 @@ function initBehavioralRadar() {
   function renderRadar() {
     ctx.clearRect(0, 0, width, height);
 
-    // 1. Dark radar background
+    // 1. Dark smoked glass radar background
     const bgGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxRadius);
-    bgGrad.addColorStop(0, '#040d1a');
-    bgGrad.addColorStop(0.7, '#030812');
-    bgGrad.addColorStop(1, '#020408');
+    bgGrad.addColorStop(0, '#0a0a0a');
+    bgGrad.addColorStop(0.7, '#050505');
+    bgGrad.addColorStop(1, '#000000');
     ctx.fillStyle = bgGrad;
     ctx.beginPath();
     ctx.arc(centerX, centerY, maxRadius, 0, Math.PI * 2);
     ctx.fill();
 
     // 2. Range concentric rings (2km, 4km, 6km, 8km, 10km)
-    ctx.strokeStyle = 'rgba(6, 182, 212, 0.25)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
     ctx.lineWidth = 1;
-    ctx.font = '9px JetBrains Mono, monospace';
-    ctx.fillStyle = 'rgba(6, 182, 212, 0.6)';
+    ctx.font = '9px IBM Plex Mono, monospace';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
 
     for (let r = 1; r <= 5; r++) {
       const curR = (maxRadius / 5) * r;
@@ -1153,7 +1153,7 @@ function initBehavioralRadar() {
     }
 
     // 3. Crosshairs and Diagonal Azimuth Lines
-    ctx.strokeStyle = 'rgba(6, 182, 212, 0.18)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.beginPath();
     ctx.moveTo(centerX - maxRadius, centerY);
     ctx.lineTo(centerX + maxRadius, centerY);
@@ -1168,14 +1168,14 @@ function initBehavioralRadar() {
     ctx.stroke();
 
     // Azimuth Labels
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.8)';
-    ctx.font = 'bold 9px JetBrains Mono, monospace';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.font = 'bold 9px IBM Plex Mono, monospace';
     ctx.fillText('N 000°', centerX - 14, centerY - maxRadius + 10);
     ctx.fillText('E 090°', centerX + maxRadius - 38, centerY + 3);
     ctx.fillText('S 180°', centerX - 14, centerY + maxRadius - 4);
     ctx.fillText('W 270°', centerX - maxRadius + 4, centerY + 3);
 
-    // 4. Fixed Camera Network Nodes (Small Cyan Diamonds)
+    // 4. Fixed Camera Network Nodes (Silver Nodes)
     const fixedCams = [
       { id: 'CAM_01', angle: 300, dist: 3.5 },
       { id: 'CAM_02', angle: 30, dist: 4.8 },
@@ -1191,13 +1191,13 @@ function initBehavioralRadar() {
       const cx = centerX + Math.cos(rad) * rDist;
       const cy = centerY + Math.sin(rad) * rDist;
 
-      ctx.fillStyle = '#06b6d4';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
       ctx.beginPath();
       ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
-      ctx.font = '8px JetBrains Mono, monospace';
+      ctx.fillStyle = 'rgba(200, 200, 200, 0.6)';
+      ctx.font = '8px IBM Plex Mono, monospace';
       ctx.fillText(cam.id, cx + 5, cy - 3);
     });
 
@@ -1210,14 +1210,15 @@ function initBehavioralRadar() {
       const bx = centerX + Math.cos(rad) * rDist;
       const by = centerY + Math.sin(rad) * rDist;
 
-      // Color mapping
-      let blipColor = '#f43f5e'; // Red (Cloning)
-      if (t.threat_type === 'TACTICAL_CONVOY') blipColor = '#f59e0b'; // Amber
-      if (t.threat_type === 'SURVEILLANCE_LOITERING') blipColor = '#a855f7'; // Purple
+      // Restrained minimal semantic differentiation
+      let blipColor = '#ffffff'; // White core
+      let pulseColor = 'rgba(244, 63, 94, 0.8)'; // Red accent (Cloning)
+      if (t.threat_type === 'TACTICAL_CONVOY') pulseColor = 'rgba(245, 158, 11, 0.8)'; // Amber
+      if (t.threat_type === 'SURVEILLANCE_LOITERING') pulseColor = 'rgba(192, 132, 252, 0.8)'; // Subtle violet/white
 
       // Pulsing outer beacon ring
       const pulseSize = 4 + Math.sin(Date.now() * 0.006) * 3;
-      ctx.strokeStyle = blipColor;
+      ctx.strokeStyle = pulseColor;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(bx, by, pulseSize, 0, Math.PI * 2);
@@ -1231,10 +1232,10 @@ function initBehavioralRadar() {
 
       // Plate tag label
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 8px JetBrains Mono, monospace';
+      ctx.font = 'bold 8px IBM Plex Mono, monospace';
       ctx.fillText(t.primary_plate, bx + 7, by - 4);
 
-      // If Plate Cloning, draw coupled duplicate blip & dashed quantum entanglement link
+      // If Plate Cloning, draw coupled duplicate blip & dashed link
       if (t.threat_type === 'PLATE_CLONING') {
         const rad2 = ((t.radar_angle_deg + 140) * Math.PI) / 180;
         const rDist2 = Math.min(maxRadius - 10, rDist * 1.15);
@@ -1242,7 +1243,7 @@ function initBehavioralRadar() {
         const by2 = centerY + Math.sin(rad2) * rDist2;
 
         ctx.setLineDash([3, 3]);
-        ctx.strokeStyle = 'rgba(244, 63, 94, 0.65)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
         ctx.beginPath();
         ctx.moveTo(bx, by);
         ctx.lineTo(bx2, by2);
@@ -1250,7 +1251,7 @@ function initBehavioralRadar() {
         ctx.setLineDash([]);
 
         // Duplicate blip
-        ctx.fillStyle = '#ef4444';
+        ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(bx2, by2, 3, 0, Math.PI * 2);
         ctx.fill();
@@ -1261,11 +1262,11 @@ function initBehavioralRadar() {
       if (t.threat_type === 'TACTICAL_CONVOY') {
         const bxLead = bx + 7;
         const byLead = by + 6;
-        ctx.fillStyle = '#fbbf24';
+        ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(bxLead, byLead, 2.8, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(bx, by);
@@ -1276,7 +1277,7 @@ function initBehavioralRadar() {
       // If Surveillance Loitering, draw dashed orbital surveillance loop
       if (t.threat_type === 'SURVEILLANCE_LOITERING') {
         ctx.setLineDash([2, 3]);
-        ctx.strokeStyle = 'rgba(168, 85, 247, 0.5)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
         ctx.beginPath();
         ctx.arc(bx, by, 12, 0, Math.PI * 2);
         ctx.stroke();
@@ -1284,13 +1285,13 @@ function initBehavioralRadar() {
       }
     });
 
-    // 6. Sweeping Beam Arc
+    // 6. Sweeping Beam Arc (Monochrome white sweep)
     radarSweepAngle += 0.022;
     if (radarSweepAngle >= Math.PI * 2) radarSweepAngle = 0;
 
     const sweepGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxRadius);
-    sweepGrad.addColorStop(0, 'rgba(6, 182, 212, 0)');
-    sweepGrad.addColorStop(1, 'rgba(6, 182, 212, 0.35)');
+    sweepGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    sweepGrad.addColorStop(1, 'rgba(255, 255, 255, 0.22)');
 
     ctx.save();
     ctx.beginPath();
@@ -1301,7 +1302,7 @@ function initBehavioralRadar() {
     ctx.fill();
 
     // Leading sweep line
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(centerX, centerY);
@@ -1310,8 +1311,8 @@ function initBehavioralRadar() {
     ctx.restore();
 
     // Outer border ring
-    ctx.strokeStyle = 'rgba(6, 182, 212, 0.6)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(centerX, centerY, maxRadius, 0, Math.PI * 2);
     ctx.stroke();
@@ -1394,50 +1395,50 @@ function renderWhatIfRoadRack(impacts) {
   const rack = document.getElementById('whatif-road-breakdown-rack');
   if (!rack) return;
   if (!impacts || impacts.length === 0) {
-    rack.innerHTML = '<div class="text-xs text-gray-500 col-span-full py-2">Executing simulation calculations...</div>';
+    rack.innerHTML = '<div class="text-xs text-zinc-500 col-span-full py-2 font-mono">Executing simulation calculations...</div>';
     return;
   }
 
   rack.innerHTML = impacts.map(r => {
-    let badgeClass = 'bg-emerald-950/70 text-emerald-400 border-emerald-500/30';
+    let badgeClass = 'bg-white/10 text-zinc-300 border-white/20';
     let statusText = 'NORMAL';
     let icon = 'fa-check';
 
     if (r.is_closed || r.status === 'CLOSED') {
-      badgeClass = 'bg-rose-950/90 text-rose-300 border-rose-500/50 animate-pulse';
+      badgeClass = 'bg-white/20 text-white border-white/40 animate-pulse';
       statusText = 'CLOSED';
       icon = 'fa-ban';
     } else if (r.is_detour || r.status === 'DETOUR_CONGESTED') {
-      badgeClass = 'bg-amber-950/90 text-amber-300 border-amber-500/50';
+      badgeClass = 'bg-white/15 text-white border-white/30';
       statusText = 'DETOUR SPIKE';
       icon = 'fa-triangle-exclamation';
     } else if (r.simulated_congestion_pct > 65) {
-      badgeClass = 'bg-rose-950/90 text-rose-300 border-rose-500/50';
+      badgeClass = 'bg-white/15 text-white border-white/30';
       statusText = 'HEAVY';
       icon = 'fa-fire-flame-curved';
     } else if (r.simulated_congestion_pct < 35) {
-      badgeClass = 'bg-cyan-950/80 text-cyan-300 border-cyan-500/40';
+      badgeClass = 'bg-white/10 text-zinc-300 border-white/20';
       statusText = 'FREE FLOW';
       icon = 'fa-bolt';
     }
 
     return `
-      <div class="p-3 bg-slate-950/90 rounded-xl border border-slate-800 space-y-1.5 transition hover:border-cyan-500/40 hover:bg-slate-900/60 shadow-lg">
+      <div class="p-3 bg-white/[0.03] rounded-xl border border-white/10 space-y-1.5 transition hover:border-white/25 hover:bg-white/[0.06] shadow-lg">
         <div class="flex items-center justify-between text-[10px] font-mono">
-          <span class="text-gray-400 truncate max-w-[85px]">${r.road_id}</span>
-          <span class="px-1.5 py-0.5 rounded border text-[9px] font-bold ${badgeClass}">
+          <span class="text-zinc-400 truncate max-w-[85px]">${r.road_id}</span>
+          <span class="px-2 py-0.5 rounded-full border text-[9px] font-semibold ${badgeClass}">
             <i class="fa-solid ${icon} mr-0.5"></i>${statusText}
           </span>
         </div>
-        <div class="text-xs font-bold text-white truncate" title="${r.road_name}">${r.road_name}</div>
-        <div class="grid grid-cols-2 gap-1 text-[11px] font-mono pt-1 border-t border-slate-800/80">
+        <div class="text-xs font-semibold text-white truncate" title="${r.road_name}">${r.road_name}</div>
+        <div class="grid grid-cols-2 gap-1 text-[11px] font-mono pt-1.5 border-t border-white/10">
           <div>
-            <span class="text-gray-500 text-[10px]">CONG: </span>
-            <span class="${r.simulated_congestion_pct > 65 ? 'text-rose-400 font-bold' : (r.simulated_congestion_pct > 40 ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold')}">${r.simulated_congestion_pct}%</span>
+            <span class="text-zinc-500 text-[10px]">CONG: </span>
+            <span class="text-white font-bold">${r.simulated_congestion_pct}%</span>
           </div>
           <div>
-            <span class="text-gray-500 text-[10px]">SPD: </span>
-            <span class="text-cyan-300 font-bold">${r.simulated_speed_kmh} km/h</span>
+            <span class="text-zinc-500 text-[10px]">SPD: </span>
+            <span class="text-zinc-300 font-bold">${r.simulated_speed_kmh} km/h</span>
           </div>
         </div>
       </div>

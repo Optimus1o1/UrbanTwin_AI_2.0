@@ -11,6 +11,7 @@ from app.models.schemas import (
     SignalOverrideRequest,
     CorridorTelemetry
 )
+from app.services.road_network import get_corridor_road_path, map_gis_to_3d_coordinates
 
 # Active Green Corridors In-Memory Store
 CORRIDORS_DB: Dict[str, GreenCorridorRoute] = {}
@@ -189,8 +190,14 @@ def _build_junction_controls(junction_list: List[dict], vehicle_speed_kmh: float
         )
     return controls
 
-def _generate_dense_interpolated_path(junction_list: List[dict]) -> tuple:
+def _generate_dense_interpolated_path(junction_list: List[dict], corridor_id: Optional[str] = None) -> tuple:
     """Generate high-resolution GIS coordinates and 3D WebGL waypoints between junctions."""
+    if corridor_id:
+        osm_path = get_corridor_road_path(corridor_id, fallback_juncs=junction_list)
+        if osm_path and len(osm_path) >= 2:
+            coords_3d = map_gis_to_3d_coordinates(osm_path)
+            return osm_path, coords_3d
+
     gis_coords = []
     coords_3d = []
 
@@ -221,7 +228,7 @@ def _init_default_scenarios():
 
     # Scenario 1: Code-Red Cardiac Life Support Ambulance Run
     route1_juncs = [JUNCTIONS_CONFIG[0], JUNCTIONS_CONFIG[1], JUNCTIONS_CONFIG[2], JUNCTIONS_CONFIG[3]]
-    gis1, coords3d_1 = _generate_dense_interpolated_path(route1_juncs)
+    gis1, coords3d_1 = _generate_dense_interpolated_path(route1_juncs, corridor_id="CORRIDOR-ALS-911")
     dist1 = sum(haversine_distance_km(gis1[k][0], gis1[k][1], gis1[k+1][0], gis1[k+1][1]) for k in range(len(gis1)-1))
     eta_no_corr1 = round((dist1 / 22.0) * 60.0, 1) # Normal city crawl (22 km/h)
     eta_with_corr1 = round((dist1 / 62.0) * 60.0, 1) # Green wave express (62 km/h)
@@ -278,7 +285,7 @@ def _init_default_scenarios():
 
     # Scenario 2: 4-Alarm Rapid Fire Engine Response
     route2_juncs = [JUNCTIONS_CONFIG[3], JUNCTIONS_CONFIG[2], JUNCTIONS_CONFIG[4]]
-    gis2, coords3d_2 = _generate_dense_interpolated_path(route2_juncs)
+    gis2, coords3d_2 = _generate_dense_interpolated_path(route2_juncs, corridor_id="CORRIDOR-FIRE-101")
     dist2 = sum(haversine_distance_km(gis2[k][0], gis2[k][1], gis2[k+1][0], gis2[k+1][1]) for k in range(len(gis2)-1))
     eta_no_corr2 = round((dist2 / 20.0) * 60.0, 1)
     eta_with_corr2 = round((dist2 / 58.0) * 60.0, 1)
@@ -335,7 +342,7 @@ def _init_default_scenarios():
 
     # Scenario 3: Zero-Delay Pediatric Organ Transport Unit
     route3_juncs = [JUNCTIONS_CONFIG[5], JUNCTIONS_CONFIG[6], JUNCTIONS_CONFIG[2]]
-    gis3, coords3d_3 = _generate_dense_interpolated_path(route3_juncs)
+    gis3, coords3d_3 = _generate_dense_interpolated_path(route3_juncs, corridor_id="CORRIDOR-ORGAN-5500")
     dist3 = sum(haversine_distance_km(gis3[k][0], gis3[k][1], gis3[k+1][0], gis3[k+1][1]) for k in range(len(gis3)-1))
     eta_no_corr3 = round((dist3 / 24.0) * 60.0, 1)
     eta_with_corr3 = round((dist3 / 68.0) * 60.0, 1)
@@ -430,8 +437,9 @@ def dispatch_emergency_corridor(req: CorridorDispatchRequest) -> GreenCorridorRo
         return c
 
     # Custom Dispatch: build multi-junction route from available city nodes
+    new_id = f"CORRIDOR-{req.vehicle_type.value[:3]}-{datetime.now(timezone.utc).strftime('%H%M%S')}"
     custom_juncs = [JUNCTIONS_CONFIG[0], JUNCTIONS_CONFIG[1], JUNCTIONS_CONFIG[2], JUNCTIONS_CONFIG[3]]
-    gis_path, coords_3d = _generate_dense_interpolated_path(custom_juncs)
+    gis_path, coords_3d = _generate_dense_interpolated_path(custom_juncs, corridor_id=new_id)
     total_dist = sum(haversine_distance_km(gis_path[k][0], gis_path[k][1], gis_path[k+1][0], gis_path[k+1][1]) for k in range(len(gis_path)-1))
     eta_base = round((total_dist / 22.0) * 60.0, 1)
     eta_cleared = round((total_dist / max(45.0, req.speed_kmh)) * 60.0, 1)
@@ -439,8 +447,6 @@ def dispatch_emergency_corridor(req: CorridorDispatchRequest) -> GreenCorridorRo
     plate = req.plate_number or req.license_plate or "KA-01-XX-0000"
     callsign = req.callsign or "EMERGENCY-DISPATCH"
     priority = req.priority_level or "CODE_RED"
-
-    new_id = f"CORRIDOR-{req.vehicle_type.value[:3]}-{datetime.now(timezone.utc).strftime('%H%M%S')}"
     vehicle = EmergencyVehicle(
         vehicle_id=f"VEH-EMG-{datetime.now(timezone.utc).strftime('%M%S')}",
         callsign=callsign,

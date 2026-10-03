@@ -5,6 +5,7 @@ from app.models.schemas import (
     VehicleTrajectory, TrajectoryWaypoint, TrajectoryQuery, CrossCameraMatch, MatchBreakdown
 )
 from app.core.security import anonymize_plate
+from app.services.road_network import get_trajectory_road_path, map_gis_to_3d_coordinates
 
 # Simulated database of reconstructed vehicle journeys across the city
 TRAJECTORIES_DB: Dict[str, Dict[str, Any]] = {
@@ -185,6 +186,13 @@ def reconstruct_trajectory(plate_query: str) -> Optional[VehicleTrajectory]:
     avg_speed = round(sum(speeds) / len(speeds), 1) if speeds else 0.0
     max_speed = max(speeds) if speeds else 0.0
 
+    dense_road_2d = get_trajectory_road_path(raw_wps)
+    if dense_road_2d and len(dense_road_2d) >= 2:
+        dense_road_3d = map_gis_to_3d_coordinates(dense_road_2d)
+    else:
+        dense_road_2d = route_2d
+        dense_road_3d = route_3d
+
     return VehicleTrajectory(
         plate_text=data["plate_text"],
         plate_masked=f"{data['plate_text'][:3]}-***",
@@ -200,8 +208,8 @@ def reconstruct_trajectory(plate_query: str) -> Optional[VehicleTrajectory]:
         is_blacklisted=data.get("is_blacklisted", False),
         blacklist_reason=data.get("blacklist_reason"),
         waypoints=waypoints,
-        route_coordinates=route_2d,
-        route_3d_coordinates=route_3d,
+        route_coordinates=dense_road_2d,
+        route_3d_coordinates=dense_road_3d,
         anomalies_detected=anomalies
     )
 

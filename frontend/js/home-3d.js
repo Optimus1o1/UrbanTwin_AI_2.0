@@ -48,8 +48,8 @@
 
     // Scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050811);
-    scene.fog = new THREE.FogExp2(0x050811, 0.012);
+    scene.background = new THREE.Color(0x000000);
+    scene.fog = new THREE.FogExp2(0x000000, 0.012);
 
     // Camera
     camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.5, 300);
@@ -134,49 +134,49 @@
 
   // LIGHTING
   function setupLights() {
-    const ambientLight = new THREE.AmbientLight(0x0f172a, 2.0);
+    const ambientLight = new THREE.AmbientLight(0x222222, 2.2);
     scene.add(ambientLight);
 
-    const dirLight1 = new THREE.DirectionalLight(0x06b6d4, 2.2);
+    const dirLight1 = new THREE.DirectionalLight(0xffffff, 2.5);
     dirLight1.position.set(30, 50, 40);
     scene.add(dirLight1);
 
-    const dirLight2 = new THREE.DirectionalLight(0x8b5cf6, 1.6);
+    const dirLight2 = new THREE.DirectionalLight(0xd4d4d8, 1.8);
     dirLight2.position.set(-30, 40, -30);
     scene.add(dirLight2);
 
-    const centerPointLight = new THREE.PointLight(0x06b6d4, 3, 60);
+    const centerPointLight = new THREE.PointLight(0xffffff, 2.8, 65);
     centerPointLight.position.set(0, 8, 0);
     scene.add(centerPointLight);
   }
 
   // GROUND & RADAR GRID
   function buildGroundAndGrid() {
-    // Holographic Cyber Grid
-    const grid = new THREE.GridHelper(90, 45, 0x06b6d4, 0x111c30);
+    // Monochrome Precision Matrix Grid
+    const grid = new THREE.GridHelper(90, 45, 0x52525b, 0x18181b);
     grid.position.y = 0;
     scene.add(grid);
 
-    // Ground plane
+    // Deep Obsidian Ground Plane
     const groundGeo = new THREE.PlaneGeometry(120, 120);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x070b16,
-      roughness: 0.8,
-      metalness: 0.5
+      color: 0x050505,
+      roughness: 0.9,
+      metalness: 0.3
     });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.1;
     scene.add(ground);
 
-    // Concentric Pulse Rings
+    // Concentric Pulse Rings (Monochrome Glass White)
     for (let r = 12; r <= 48; r += 12) {
       const ringGeo = new THREE.RingGeometry(r - 0.1, r, 64);
       const ringMat = new THREE.MeshBasicMaterial({
-        color: 0x06b6d4,
+        color: 0xffffff,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.22 - (r / 250)
+        opacity: 0.16 - (r / 350)
       });
       const ring = new THREE.Mesh(ringGeo, ringMat);
       ring.rotation.x = Math.PI / 2;
@@ -192,23 +192,23 @@
         pathPoints.map(p => new THREE.Vector3(p.x, 0.1, p.z))
       );
       
-      // Road Surface Ribbon
+      // Road Surface Ribbon (Dark Obsidian Asphalt)
       const roadGeo = new THREE.TubeGeometry(curve, 64, 1.4, 4, false);
       const roadMat = new THREE.MeshStandardMaterial({
-        color: 0x0a1122,
-        roughness: 0.4,
-        metalness: 0.7
+        color: 0x0c0c0e,
+        roughness: 0.5,
+        metalness: 0.6
       });
       const roadMesh = new THREE.Mesh(roadGeo, roadMat);
       roadMesh.scale.set(1, 0.08, 1);
       roadsGroup.add(roadMesh);
 
-      // Glowing Centerline
+      // Glowing Centerline (Pure Crisp White)
       const lineGeo = new THREE.TubeGeometry(curve, 64, 0.08, 4, false);
       const lineMat = new THREE.MeshBasicMaterial({
-        color: 0x06b6d4,
+        color: 0xffffff,
         transparent: true,
-        opacity: 0.7
+        opacity: 0.75
       });
       const lineMesh = new THREE.Mesh(lineGeo, lineMat);
       lineMesh.position.y = 0.12;
@@ -216,10 +216,10 @@
     });
   }
 
-  // 3D PROCEDURAL SKYSCRAPERS
+  // 3D PROCEDURAL SKYSCRAPERS (Smoked Glass Monoliths)
   function buildCitySkyscrapers() {
-    const buildingPalette = [0x0f172a, 0x1e293b, 0x0c1322, 0x111e38];
-    const edgePalette = [0x06b6d4, 0x38bdf8, 0x8b5cf6, 0x10b981];
+    const buildingPalette = [0x09090b, 0x121215, 0x18181b, 0x202024, 0x27272a];
+    const edgePalette = [0xffffff, 0xe4e4e7, 0xd4d4d8, 0xa1a1aa];
 
     for (let x = -36; x <= 36; x += 6) {
       for (let z = -36; z <= 36; z += 6) {
@@ -238,8 +238,8 @@
 
           const bMat = new THREE.MeshStandardMaterial({
             color: buildingPalette[Math.floor(Math.random() * buildingPalette.length)],
-            roughness: 0.2,
-            metalness: 0.85
+            roughness: 0.25,
+            metalness: 0.9
           });
 
           const bGeo = new THREE.BoxGeometry(w, h, d);
@@ -247,13 +247,13 @@
           building.position.set(x + (Math.random() - 0.5) * 1.2, h / 2, z + (Math.random() - 0.5) * 1.2);
           buildingsGroup.add(building);
 
-          // Glowing building edge lines
+          // Glowing building edge lines (Crisp Silver & White)
           const edgeGeo = new THREE.EdgesGeometry(bGeo);
           const edgeColor = edgePalette[Math.floor(Math.random() * edgePalette.length)];
           const edgeMat = new THREE.LineBasicMaterial({
             color: edgeColor,
             transparent: true,
-            opacity: Math.random() * 0.4 + 0.35
+            opacity: Math.random() * 0.3 + 0.35
           });
           const edgeLine = new THREE.LineSegments(edgeGeo, edgeMat);
           building.add(edgeLine);
@@ -261,13 +261,13 @@
           // Antenna beacon
           if (h > 24) {
             const antGeo = new THREE.CylinderGeometry(0.08, 0.08, 3.5, 8);
-            const antMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8 });
+            const antMat = new THREE.MeshBasicMaterial({ color: 0x71717a });
             const ant = new THREE.Mesh(antGeo, antMat);
             ant.position.set(0, h / 2 + 1.75, 0);
             building.add(ant);
 
             const beaconGeo = new THREE.SphereGeometry(0.3, 8, 8);
-            const beaconMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
+            const beaconMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
             const beacon = new THREE.Mesh(beaconGeo, beaconMat);
             beacon.position.set(0, h / 2 + 3.5, 0);
             building.add(beacon);
@@ -277,7 +277,7 @@
     }
   }
 
-  // 3D ANPR CAMERA TOWERS WITH PULSING SCANNING LASER CONES
+  // 3D ANPR CAMERA TOWERS WITH MONOCHROME SCANNING LASER CONES
   function buildSensorTowers() {
     sensorNodes = [];
     CAMERA_NODES_CONFIG.forEach(cfg => {
@@ -287,25 +287,25 @@
 
       // Vertical structural lattice mast
       const mastGeo = new THREE.CylinderGeometry(0.15, 0.25, 3.8, 8);
-      const mastMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.9, roughness: 0.2 });
+      const mastMat = new THREE.MeshStandardMaterial({ color: 0x52525b, metalness: 0.9, roughness: 0.2 });
       const mast = new THREE.Mesh(mastGeo, mastMat);
       mast.position.y = -1.9;
       nodeGroup.add(mast);
 
-      // Camera Head Housing
+      // Camera Head Housing (Dark Smoked Glass Body)
       const headGeo = new THREE.BoxGeometry(0.9, 0.6, 1.2);
       const headMat = new THREE.MeshStandardMaterial({
-        color: cfg.status === 'dense' ? 0xf59e0b : 0x06b6d4,
-        emissive: cfg.status === 'dense' ? 0xd97706 : 0x0891b2,
+        color: 0x18181b,
+        emissive: 0x27272a,
         emissiveIntensity: 0.85
       });
       const head = new THREE.Mesh(headGeo, headMat);
       head.name = "sensorCore";
       nodeGroup.add(head);
 
-      // Optical Dual-Lens (Cyan Glowing)
+      // Optical Dual-Lens (Crisp White Glow)
       const lensGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.3, 16);
-      const lensMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+      const lensMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const lens1 = new THREE.Mesh(lensGeo, lensMat);
       lens1.rotation.x = Math.PI / 2;
       lens1.position.set(0.22, 0, 0.6);
@@ -316,20 +316,20 @@
       lens2.position.set(-0.22, 0, 0.6);
       head.add(lens2);
 
-      // Holographic Rotating Radar Ring
+      // Holographic Rotating Radar Ring (Silver Glass)
       const ringGeo = new THREE.TorusGeometry(1.6, 0.05, 8, 32);
-      const ringMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.75 });
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.65 });
       const ring = new THREE.Mesh(ringGeo, ringMat);
       ring.rotation.x = Math.PI / 2;
       ring.name = "sensorRing";
       nodeGroup.add(ring);
 
-      // Scanning Laser Cone onto the Road
+      // Scanning Laser Cone onto the Road (Subtle Smoked Light Cone)
       const coneGeo = new THREE.ConeGeometry(3.5, 4.0, 16, 1, true);
       const coneMat = new THREE.MeshBasicMaterial({
-        color: 0x06b6d4,
+        color: 0xffffff,
         transparent: true,
-        opacity: 0.15,
+        opacity: 0.09,
         side: THREE.DoubleSide
       });
       const cone = new THREE.Mesh(coneGeo, coneMat);
@@ -341,10 +341,10 @@
       // Ground Pulsing Ring
       const groundRingGeo = new THREE.RingGeometry(0.2, 2.5, 32);
       const groundRingMat = new THREE.MeshBasicMaterial({
-        color: 0x06b6d4,
+        color: 0xffffff,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.35
+        opacity: 0.22
       });
       const groundRing = new THREE.Mesh(groundRingGeo, groundRingMat);
       groundRing.rotation.x = Math.PI / 2;
@@ -356,9 +356,9 @@
     });
   }
 
-  // 3D VEHICLES CRUISING SIMULATION
+  // 3D VEHICLES CRUISING SIMULATION (Monochrome Palette)
   function initVehiclesSimulation() {
-    const vehicleColors = [0x06b6d4, 0x10b981, 0x38bdf8, 0xa855f7, 0xf59e0b, 0xe2e8f0];
+    const vehicleColors = [0xffffff, 0xe4e4e7, 0xd4d4d8, 0xa1a1aa, 0x71717a, 0x52525b, 0x3f3f46, 0x27272a];
     const vehicleCount = 75;
 
     for (let i = 0; i < vehicleCount; i++) {
@@ -373,21 +373,21 @@
       const bodyMat = new THREE.MeshStandardMaterial({
         color: vColor,
         roughness: 0.2,
-        metalness: 0.8
+        metalness: 0.85
       });
       const body = new THREE.Mesh(bodyGeo, bodyMat);
       vGroup.add(body);
 
       // Cabin / Windshield
       const cabinGeo = new THREE.BoxGeometry(0.75, 0.35, 0.9);
-      const cabinMat = new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.1, metalness: 0.9 });
+      const cabinMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1, metalness: 0.95 });
       const cabin = new THREE.Mesh(cabinGeo, cabinMat);
       cabin.position.set(0, 0.35, -0.1);
       vGroup.add(cabin);
 
-      // Headlights (Glowing Cyan/White)
+      // Headlights (Crisp White Glow)
       const lightGeo = new THREE.BoxGeometry(0.2, 0.1, 0.05);
-      const headMat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe });
+      const headMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const hlLeft = new THREE.Mesh(lightGeo, headMat);
       hlLeft.position.set(-0.3, 0.05, 0.91);
       vGroup.add(hlLeft);
@@ -396,7 +396,7 @@
       hlRight.position.set(0.3, 0.05, 0.91);
       vGroup.add(hlRight);
 
-      // Tail lights (Red)
+      // Tail lights (Subtle Red Brake Lights)
       const tailMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
       const tlLeft = new THREE.Mesh(lightGeo, tailMat);
       tlLeft.position.set(-0.3, 0.05, -0.91);
@@ -431,12 +431,12 @@
     const points3D = waypoints.map(w => new THREE.Vector3(w.x_3d, 1.2, w.z_3d));
     const curve = new THREE.CatmullRomCurve3(points3D);
 
-    // Glowing Neon Trajectory Tube
+    // Glowing Pure White Trajectory Tube
     const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.35, 8, false);
     const tubeMat = new THREE.MeshBasicMaterial({
-      color: 0x06b6d4,
+      color: 0xffffff,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.9,
       wireframe: false
     });
     const tube = new THREE.Mesh(tubeGeo, tubeMat);
@@ -449,7 +449,7 @@
 
       const sphereGeo = new THREE.SphereGeometry(0.75, 16, 16);
       const sphereMat = new THREE.MeshBasicMaterial({
-        color: wp.is_speeding ? 0xef4444 : 0x10b981
+        color: wp.is_speeding ? 0xef4444 : 0xffffff
       });
       const sphere = new THREE.Mesh(sphereGeo, sphereMat);
       beaconGroup.add(sphere);
@@ -457,7 +457,7 @@
       // Pulsing Ring
       const ringGeo = new THREE.RingGeometry(0.8, 1.5, 24);
       const ringMat = new THREE.MeshBasicMaterial({
-        color: wp.is_speeding ? 0xef4444 : 0x10b981,
+        color: wp.is_speeding ? 0xef4444 : 0xffffff,
         side: THREE.DoubleSide,
         transparent: true,
         opacity: 0.7
@@ -720,7 +720,7 @@
             if (hoveredBuilding !== b) {
               if (hoveredBuilding && hoveredBuilding.material) hoveredBuilding.material.emissive?.setHex(0x000000);
               hoveredBuilding = b;
-              if (b.material && b.material.emissive) b.material.emissive.setHex(0x06b6d4);
+              if (b.material && b.material.emissive) b.material.emissive.setHex(0x52525b);
               showHoverBuildingTooltip(event.clientX, event.clientY, b);
             }
           } else {
@@ -740,7 +740,7 @@
     if (!tip) {
       tip = document.createElement('div');
       tip.id = 'building-3d-hover-tip';
-      tip.className = 'fixed z-50 pointer-events-none p-2 bg-slate-950/90 backdrop-blur-md border border-cyan-500/40 rounded text-[11px] text-cyan-300 font-mono shadow-lg transition-opacity duration-150';
+      tip.className = 'fixed z-50 pointer-events-none px-3 py-2 bg-black/90 backdrop-blur-xl border border-white/20 rounded-xl text-[11px] text-zinc-300 font-mono shadow-2xl transition-opacity duration-150';
       document.body.appendChild(tip);
     }
     const h = Math.round(building.position.y * 2);
@@ -748,11 +748,11 @@
     tip.style.left = `${clientX + 14}px`;
     tip.style.top = `${clientY - 10}px`;
     tip.innerHTML = `
-      <div class="font-bold text-white flex items-center space-x-1">
-        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-        <span>Urban Sector Skyscraper</span>
+      <div class="font-bold text-white flex items-center space-x-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+        <span class="tracking-wide">Urban Sector Monolith</span>
       </div>
-      <div class="text-gray-400 text-[10px]">Height: ${h}m • Monitored Grid</div>
+      <div class="text-zinc-400 text-[10px]">Height: ${h}m • Sensor Grid Supervised</div>
     `;
   }
 
@@ -806,31 +806,31 @@
     if (!hud) {
       hud = document.createElement('div');
       hud.id = 'camera-3d-hud';
-      hud.className = 'fixed z-50 pointer-events-auto p-4 glass-card border border-cyan-500/40 text-xs shadow-2xl glow-cyan max-w-xs transition-all duration-300';
+      hud.className = 'fixed z-50 pointer-events-auto p-4 bg-black/85 backdrop-blur-2xl border border-white/20 text-xs shadow-2xl rounded-2xl max-w-xs transition-all duration-300';
       document.body.appendChild(hud);
     }
     hud.style.bottom = '24px';
     hud.style.right = '24px';
     hud.innerHTML = `
-      <div class="flex items-center justify-between pb-2 border-b border-gray-800 mb-2">
+      <div class="flex items-center justify-between pb-2 border-b border-white/10 mb-2">
         <div class="flex items-center space-x-2">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
-          <span class="font-bold text-white font-mono uppercase">TARGET TRACKING</span>
+          <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+          <span class="font-bold text-white font-mono uppercase tracking-wider text-[11px]">TARGET TELEMETRY</span>
         </div>
-        <button onclick="document.getElementById('camera-3d-hud').remove()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        <button onclick="document.getElementById('camera-3d-hud').remove()" class="text-zinc-400 hover:text-white p-1"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <p class="font-bold text-cyan-300 text-sm mb-1">Cruising Urban Entity</p>
+      <p class="font-bold text-white text-sm mb-1">Cruising Entity</p>
       <div class="grid grid-cols-2 gap-2 text-center mb-3">
-        <div class="bg-gray-900/80 p-2 rounded border border-gray-800">
-          <div class="text-gray-400 text-[10px]">SPEED</div>
-          <div class="text-emerald-400 font-bold text-sm font-mono">${Math.round(45 + v.speed * 20000)} km/h</div>
+        <div class="bg-white/[0.04] p-2.5 rounded-xl border border-white/10">
+          <div class="text-zinc-400 text-[10px] uppercase font-mono">Velocity</div>
+          <div class="text-white font-bold text-sm font-mono mt-0.5">${Math.round(45 + v.speed * 20000)} km/h</div>
         </div>
-        <div class="bg-gray-900/80 p-2 rounded border border-gray-800">
-          <div class="text-gray-400 text-[10px]">STATUS</div>
-          <div class="text-white font-bold text-sm">Active Flow</div>
+        <div class="bg-white/[0.04] p-2.5 rounded-xl border border-white/10">
+          <div class="text-zinc-400 text-[10px] uppercase font-mono">Status</div>
+          <div class="text-zinc-200 font-bold text-sm mt-0.5">Active Vector</div>
         </div>
       </div>
-      <button onclick="window.set3DCameraMode('cinematic')" class="w-full py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded font-medium text-xs transition border border-slate-700 flex items-center justify-center space-x-1">
+      <button onclick="window.set3DCameraMode('cinematic')" class="w-full py-2 bg-white/[0.08] hover:bg-white/[0.15] text-white rounded-xl font-medium text-xs transition border border-white/20 flex items-center justify-center space-x-1.5">
         <i class="fa-solid fa-arrow-rotate-left mr-1"></i><span>Return to Orbit View</span>
       </button>
     `;
@@ -841,37 +841,37 @@
     if (!hud) {
       hud = document.createElement('div');
       hud.id = 'camera-3d-hud';
-      hud.className = 'fixed z-50 pointer-events-auto p-4 glass-card border border-cyan-500/40 text-xs shadow-2xl glow-cyan max-w-xs transition-all duration-300';
+      hud.className = 'fixed z-50 pointer-events-auto p-4 bg-black/85 backdrop-blur-2xl border border-white/20 text-xs shadow-2xl rounded-2xl max-w-xs transition-all duration-300';
       document.body.appendChild(hud);
     }
 
     hud.style.bottom = '24px';
     hud.style.right = '24px';
     hud.innerHTML = `
-      <div class="flex items-center justify-between pb-2 border-b border-gray-800 mb-2">
+      <div class="flex items-center justify-between pb-2 border-b border-white/10 mb-2">
         <div class="flex items-center space-x-2">
-          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
-          <span class="font-bold text-white uppercase tracking-wider">${camData.id}</span>
+          <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+          <span class="font-bold text-white uppercase tracking-wider font-mono">${camData.id}</span>
         </div>
-        <button onclick="document.getElementById('camera-3d-hud').remove()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        <button onclick="document.getElementById('camera-3d-hud').remove()" class="text-zinc-400 hover:text-white p-1"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <p class="font-bold text-cyan-300 text-sm mb-1">${camData.name}</p>
-      <p class="text-gray-400 text-xs mb-3">Sector: <span class="text-gray-200">${camData.sector || 'Urban Corridor'}</span></p>
+      <p class="font-bold text-white text-sm mb-0.5">${camData.name}</p>
+      <p class="text-zinc-400 text-[11px] mb-3">Sector: <span class="text-zinc-200 font-mono">${camData.sector || 'Urban Corridor'}</span></p>
       <div class="grid grid-cols-2 gap-2 text-center mb-3">
-        <div class="bg-gray-900/80 p-2 rounded border border-gray-800">
-          <div class="text-gray-400 text-[10px]">THROUGHPUT</div>
-          <div class="text-white font-bold text-sm">${camData.flow} vph</div>
+        <div class="bg-white/[0.04] p-2.5 rounded-xl border border-white/10">
+          <div class="text-zinc-400 text-[10px] uppercase font-mono">Throughput</div>
+          <div class="text-white font-bold text-sm font-mono mt-0.5">${camData.flow} vph</div>
         </div>
-        <div class="bg-gray-900/80 p-2 rounded border border-gray-800">
-          <div class="text-gray-400 text-[10px]">AVG SPEED</div>
-          <div class="text-emerald-400 font-bold text-sm">${camData.speed}</div>
+        <div class="bg-white/[0.04] p-2.5 rounded-xl border border-white/10">
+          <div class="text-zinc-400 text-[10px] uppercase font-mono">Mean Velocity</div>
+          <div class="text-white font-bold text-sm font-mono mt-0.5">${camData.speed}</div>
         </div>
       </div>
-      <div class="flex items-center justify-between bg-cyan-950/40 border border-cyan-500/30 p-2 rounded mb-2 text-[11px]">
-        <span class="text-gray-300">OCR Recognition:</span>
-        <span class="text-emerald-400 font-bold">96.8% (>90% Conf)</span>
+      <div class="flex items-center justify-between bg-white/[0.04] border border-white/10 p-2.5 rounded-xl mb-3 text-[11px]">
+        <span class="text-zinc-400">OCR Accuracy:</span>
+        <span class="text-white font-bold font-mono">96.8% (>90% Conf)</span>
       </div>
-      <button onclick="if(window.inspectCameraFeed) window.inspectCameraFeed('${camData.id}')" class="w-full py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-medium text-xs transition flex items-center justify-center space-x-1">
+      <button onclick="if(window.inspectCameraFeed) window.inspectCameraFeed('${camData.id}')" class="w-full py-2 bg-white text-black hover:bg-zinc-200 font-bold rounded-xl text-xs transition flex items-center justify-center space-x-1.5 shadow-lg shadow-white/10">
         <i class="fa-solid fa-video mr-1"></i><span>Inspect Camera Feed</span>
       </button>
     `;
