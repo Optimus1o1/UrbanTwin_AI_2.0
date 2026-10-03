@@ -19,6 +19,11 @@ import threading
 import cv2
 import numpy as np
 import urllib.request
+import urllib.parse
+import urllib.error
+import ssl
+import socket
+import base64
 import re
 import concurrent.futures
 from typing import Dict, Any, Optional, Generator, List, Tuple
@@ -737,13 +742,14 @@ class LiveVehicleRecognitionEngine:
 
 class UniversalStreamCapture:
     """
-    Universal High-Performance Stream Ingestion Capture Engine.
-    Handles:
-    1. Smartphone IP Webcam (HTTP multipart MJPEG e.g. http://<ip>:8080/video or /videofeed)
-    2. Smartphone Snapshot Polling (HTTP JPEG snapshots e.g. http://<ip>:8080/shot.jpg or /photo.jpg)
+    Universal High-Performance Zero-Latency Stream Ingestion Capture Engine.
+    Engineered for:
+    1. Smartphone IP Webcam (HTTP multipart MJPEG e.g. http://<ip>:8080/video, /videofeed, /mjpegfeed, /live)
+    2. Smartphone Snapshot Polling (HTTP JPEG snapshots e.g. http://<ip>:8080/shot.jpg, /photo.jpg)
     3. RTSP CCTV Video Streams (rtsp://...)
-    4. Automatically downscales incoming oversized frames (>1280x720) down to max 1280x720 to prevent CPU lockup.
-    5. Non-blocking reconnect loop with zero socket backlog.
+    4. Zero Socket Backlog: actively flushes intermediate buffered frames and decodes ONLY the latest completed frame.
+    5. Multi-Endpoint Auto-Discovery: automatically probes candidate endpoints if the given path returns 404 or drops.
+    6. Non-blocking low-latency downscaling to 960x540 using fast INTER_LINEAR.
     """
     def __init__(self, source: str):
         self.source = str(source).strip()
@@ -755,105 +761,270 @@ class UniversalStreamCapture:
         self.error_msg = ""
         self.fps = 0.0
         self.frame_count = 0
+        self.last_frame_time = 0.0
         self.cap = None
+        self.active_stream = None
 
         self.thread = threading.Thread(target=self._worker_loop, daemon=True)
         self.thread.start()
 
-    def _worker_loop(self):
-        url = self.source
+    def _get_candidate_urls(self, raw_url: str) -> List[str]:
+        url = raw_url.strip()
         if not url.startswith(("http://", "https://", "rtsp://")):
             url = "http://" + url
-        if (url.startswith("http://") or url.startswith("https://")) and not any(k in url for k in ["/video", "/videofeed", ".mjpg", "/shot.jpg", "/photo.jpg", "/snapshot.jpg"]):
-            url = url.rstrip("/") + "/video"
 
-        is_http = url.startswith(("http://", "https://"))
+        if url.startswith("rtsp://"):
+            return [url]
+
+        parsed = urllib.parse.urlsplit(url)
+        scheme = parsed.scheme or "http"
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port
+        path = parsed.path or ""
+
+        candidates = []
+        # If user explicitly supplied a full path like /shot.jpg, /photo.jpg, /mjpegfeed, /live, /video:
+        if path and path not in ('/', ''):
+            candidates.append(url)
+
+        # Base with current port or standard ports (8080 for IP Webcam, 4747 for DroidCam)
+        ports_to_try = [port] if port else [8080, 4747, 80]
+
+        standard_endpoints = [
+            "/video",          # IP Webcam (Android), DroidCam
+            "/videofeed",      # IP Webcam alternate
+            "/shot.jpg",       # IP Webcam snapshot
+            "/photo.jpg",      # Alternate snapshot
+            "/mjpegfeed",      # DroidCam alternate
+            "/live",           # iOS IP Camera Lite / RTSP-over-HTTP
+            "/video.mjpg",     # Axis / MJPEG standard
+            "/mjpeg",          # Generic IP cams
+            "/"                # Root
+        ]
+
+        for p in ports_to_try:
+            base = f"{scheme}://{host}" + (f":{p}" if p else "")
+            for ep in standard_endpoints:
+                full = base + ep
+                if full not in candidates:
+                    candidates.append(full)
+
+        return candidates
+
+    def _probe_url(self, url: str) -> bool:
+        """Fast low-latency check (1.5s timeout) to see if endpoint is responsive."""
+        ssl_ctx = ssl._create_unverified_context()
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'UrbanTwinAI/2.0 Probe'})
+            parsed = urllib.parse.urlsplit(url)
+            if parsed.username and parsed.password:
+                auth_str = f"{parsed.username}:{parsed.password}"
+                auth_b64 = base64.b64encode(auth_str.encode()).decode()
+                req.add_header("Authorization", f"Basic {auth_b64}")
+            with urllib.request.urlopen(req, timeout=1.5, context=ssl_ctx) as resp:
+                status = resp.status
+                ct = resp.headers.get('Content-Type', '').lower()
+                return (status in (200, 204, 206)) and ('image' in ct or 'multipart' in ct or 'octet-stream' in ct or 'video' in ct)
+        except urllib.error.HTTPError as he:
+            # 401 Unauthorized confirms the camera server is up and listening
+            return he.code in (401, 200)
+        except Exception:
+            return False
+
+    def _worker_loop(self):
+        candidates = self._get_candidate_urls(self.source)
 
         while self.running:
-            if is_http:
-                success = self._read_http_mjpeg(url)
-                if not success and self.running:
-                    # Auto-fallback to snapshot polling /shot.jpg
-                    base = re.sub(r'/(video|videofeed|mjpeg|mjpg).*$', '', url)
-                    shot_url = base + "/shot.jpg"
-                    success_snap = self._poll_http_snapshots(shot_url)
-                    if not success_snap and self.running:
-                        self._read_opencv(url)
-            else:
-                self._read_opencv(url)
+            # If RTSP stream, hand off to OpenCV directly
+            if candidates[0].startswith("rtsp://"):
+                self._read_opencv(candidates[0])
+                if self.running:
+                    time.sleep(1.0)
+                continue
+
+            active_url = candidates[0]
+            success = self._read_http_mjpeg(active_url)
+            
+            # If primary endpoint failed, quickly probe other candidates
+            if not success and self.running:
+                for cand in candidates[1:]:
+                    if not self.running:
+                        break
+                    if any(cand.endswith(x) for x in ['.jpg', '.jpeg', '/shot.jpg', '/photo.jpg']):
+                        success_snap = self._poll_http_snapshots(cand)
+                        if success_snap:
+                            success = True
+                            break
+                    elif self._probe_url(cand):
+                        success_mjpeg = self._read_http_mjpeg(cand)
+                        if success_mjpeg:
+                            success = True
+                            break
+
+            # If all HTTP attempts fail, attempt OpenCV fallback
+            if not success and self.running:
+                self._read_opencv(candidates[0])
 
             if self.running:
-                time.sleep(1.0)
+                time.sleep(0.8)
 
     def _read_http_mjpeg(self, url: str) -> bool:
+        ssl_ctx = ssl._create_unverified_context()
         req = urllib.request.Request(url, headers={'User-Agent': 'UrbanTwinAI/2.0 (High-Speed Edge Streamer)'})
+        parsed = urllib.parse.urlsplit(url)
+        if parsed.username and parsed.password:
+            auth_str = f"{parsed.username}:{parsed.password}"
+            auth_b64 = base64.b64encode(auth_str.encode()).decode()
+            req.add_header("Authorization", f"Basic {auth_b64}")
+
         try:
-            with urllib.request.urlopen(req, timeout=3.5) as stream:
-                buffer = bytearray()
-                consecutive_fails = 0
-                while self.running:
-                    chunk = stream.read(16384)
-                    if not chunk:
-                        break
-                    buffer.extend(chunk)
-
-                    a = buffer.find(b'\xff\xd8')
-                    b = buffer.find(b'\xff\xd9')
-                    if a != -1 and b != -1 and b > a:
-                        jpg_data = buffer[a:b+2]
-                        buffer = buffer[b+2:]
-
-                        frame = cv2.imdecode(np.frombuffer(jpg_data, dtype=np.uint8), cv2.IMREAD_COLOR)
-                        if frame is not None and frame.size > 0:
-                            h, w = frame.shape[:2]
-                            if w > 1280 or h > 720:
-                                frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
-                            with self.lock:
-                                self.latest_frame = frame
-                                self.is_opened = True
-                                self.status = "STREAMING"
-                                self.frame_count += 1
-                            consecutive_fails = 0
-                        else:
-                            consecutive_fails += 1
-                            if consecutive_fails > 15:
-                                break
-                return self.frame_count > 0
+            stream = urllib.request.urlopen(req, timeout=4.5, context=ssl_ctx)
+            self.active_stream = stream
         except Exception as e:
             self.error_msg = str(e)
             return False
 
+        try:
+            buffer = bytearray()
+            consecutive_fails = 0
+            while self.running:
+                try:
+                    chunk = stream.read(32768)
+                except Exception:
+                    break
+
+                if not chunk:
+                    break
+                buffer.extend(chunk)
+
+                # Step 1: Discard any bytes preceding the first SOI marker (b'\xff\xd8')
+                first_soi = buffer.find(b'\xff\xd8')
+                if first_soi == -1:
+                    if len(buffer) > 65536:
+                        buffer.clear()
+                    continue
+                if first_soi > 0:
+                    buffer = buffer[first_soi:]
+
+                # Step 2: Extract ALL complete JPEG frames present in buffer, keeping ONLY the freshest
+                newest_frame_bytes = None
+                while True:
+                    soi = buffer.find(b'\xff\xd8')
+                    if soi == -1:
+                        buffer.clear()
+                        break
+                    if soi > 0:
+                        buffer = buffer[soi:]
+                        soi = 0
+
+                    search_pos = 2
+                    found_valid_eoi = -1
+                    while True:
+                        eoi = buffer.find(b'\xff\xd9', search_pos)
+                        if eoi == -1:
+                            break
+                        cand_bytes = bytes(buffer[:eoi+2])
+                        # Filter out tiny sub-frames (e.g. embedded EXIF thumbnails < 4096 bytes)
+                        if len(cand_bytes) > 4096:
+                            found_valid_eoi = eoi
+                            break
+                        search_pos = eoi + 2
+
+                    if found_valid_eoi == -1:
+                        if len(buffer) > 3_000_000:
+                            buffer.clear()
+                        break
+
+                    frame_slice = bytes(buffer[:found_valid_eoi+2])
+                    buffer = buffer[found_valid_eoi+2:]
+                    # Overwrite so we decode ONLY the newest frame in the socket queue (zero lag)
+                    newest_frame_bytes = frame_slice
+
+                if newest_frame_bytes is not None:
+                    frame = cv2.imdecode(np.frombuffer(newest_frame_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
+                    if frame is not None and frame.size > 0:
+                        h, w = frame.shape[:2]
+                        if w > 960 or h > 540:
+                            frame = cv2.resize(frame, (960, 540), interpolation=cv2.INTER_LINEAR)
+                        with self.lock:
+                            self.latest_frame = frame
+                            self.is_opened = True
+                            self.status = "STREAMING"
+                            self.frame_count += 1
+                            self.last_frame_time = time.time()
+                        consecutive_fails = 0
+                    else:
+                        consecutive_fails += 1
+                        if consecutive_fails > 35:
+                            break
+
+            return self.frame_count > 0
+        except Exception as e:
+            self.error_msg = str(e)
+            return False
+        finally:
+            try:
+                stream.close()
+            except Exception:
+                pass
+            self.active_stream = None
+
     def _poll_http_snapshots(self, shot_url: str) -> bool:
+        ssl_ctx = ssl._create_unverified_context()
         req = urllib.request.Request(shot_url, headers={'User-Agent': 'UrbanTwinAI/2.0 (Snapshot Streamer)'})
+        parsed = urllib.parse.urlsplit(shot_url)
+        if parsed.username and parsed.password:
+            auth_str = f"{parsed.username}:{parsed.password}"
+            auth_b64 = base64.b64encode(auth_str.encode()).decode()
+            req.add_header("Authorization", f"Basic {auth_b64}")
+
         got_any = False
         consecutive_errors = 0
-        while self.running and consecutive_errors < 6:
+        while self.running and consecutive_errors < 8:
             t0 = time.time()
             try:
-                with urllib.request.urlopen(req, timeout=2.0) as resp:
+                with urllib.request.urlopen(req, timeout=2.5, context=ssl_ctx) as resp:
                     data = resp.read()
                     if data:
                         frame = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR)
                         if frame is not None and frame.size > 0:
                             h, w = frame.shape[:2]
-                            if w > 1280 or h > 720:
-                                frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
+                            if w > 960 or h > 540:
+                                frame = cv2.resize(frame, (960, 540), interpolation=cv2.INTER_LINEAR)
                             with self.lock:
                                 self.latest_frame = frame
                                 self.is_opened = True
                                 self.status = "STREAMING"
                                 self.frame_count += 1
+                                self.last_frame_time = time.time()
                             got_any = True
                             consecutive_errors = 0
             except Exception:
                 consecutive_errors += 1
 
             elapsed = time.time() - t0
-            time.sleep(max(0.03, 0.05 - elapsed))
+            time.sleep(max(0.02, 0.045 - elapsed))
         return got_any
 
     def _read_opencv(self, src: str):
+        # Quick non-blocking socket test to prevent OpenCV from blocking 30s on unreachable hosts
+        if src.startswith(("http://", "https://", "rtsp://")):
+            try:
+                parsed = urllib.parse.urlsplit(src)
+                h = parsed.hostname
+                p = parsed.port or (554 if src.startswith("rtsp://") else (443 if src.startswith("https://") else 80))
+                if h:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(1.2)
+                    res = s.connect_ex((h, p))
+                    s.close()
+                    if res != 0:
+                        return
+            except Exception:
+                pass
+
         try:
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "fflags;nobuffer|flags;low_delay|rtsp_transport;tcp"
             cap = cv2.VideoCapture(src)
             if not cap or not cap.isOpened():
                 return
@@ -867,14 +1038,15 @@ class UniversalStreamCapture:
                 if not ret or frame is None:
                     break
                 h, w = frame.shape[:2]
-                if w > 1280 or h > 720:
-                    frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
+                if w > 960 or h > 540:
+                    frame = cv2.resize(frame, (960, 540), interpolation=cv2.INTER_LINEAR)
                 with self.lock:
                     self.latest_frame = frame
                     self.is_opened = True
                     self.status = "STREAMING"
                     self.frame_count += 1
-                time.sleep(0.01)
+                    self.last_frame_time = time.time()
+                time.sleep(0.005)
         except Exception as e:
             self.error_msg = str(e)
         finally:
@@ -889,14 +1061,22 @@ class UniversalStreamCapture:
         with self.lock:
             frame = self.latest_frame
         if frame is not None:
-            return True, frame
+            return True, frame.copy()
         return False, None
 
     def isOpened(self) -> bool:
-        return self.is_opened and self.running
+        if not self.running:
+            return False
+        return self.is_opened and (time.time() - self.last_frame_time < 4.5)
 
     def release(self):
         self.running = False
+        if self.active_stream:
+            try:
+                self.active_stream.close()
+            except Exception:
+                pass
+            self.active_stream = None
         if self.cap:
             try:
                 self.cap.release()
@@ -1023,8 +1203,23 @@ class CameraStreamWorker:
             if source_url:
                 if not source_url.startswith(("http://", "https://", "rtsp://")):
                     source_url = "http://" + source_url
-                if not any(k in source_url for k in ["/video", "/videofeed", ".mjpg", "rtsp://"]):
-                    source_url = source_url.rstrip("/") + "/video"
+                try:
+                    parsed = urllib.parse.urlsplit(source_url)
+                    host = parsed.hostname or ""
+                    port = parsed.port
+                    path = parsed.path or ""
+                    # If user entered an IPv4 address without a port, default to 8080 (IP Webcam standard)
+                    if not port and re.match(r'^\d+\.\d+\.\d+\.\d+$', host):
+                        netloc = f"{host}:8080"
+                        if parsed.username and parsed.password:
+                            netloc = f"{parsed.username}:{parsed.password}@{netloc}"
+                        parsed = parsed._replace(netloc=netloc)
+                    # Only append /video if path is empty or root '/'
+                    if path in ("", "/"):
+                        parsed = parsed._replace(path="/video")
+                    source_url = urllib.parse.urlunsplit(parsed)
+                except Exception:
+                    pass
 
         if mode == "video_file":
             if not source_url:
@@ -1152,14 +1347,15 @@ class CameraStreamWorker:
                         if ret and raw_frame is not None:
                             frame_bgr, detections = self._annotate_external_frame(raw_frame)
                             self.status = "STREAMING"
+                            self.error_message = ""
                         else:
                             self.status = "WAITING_FRAME"
                             time.sleep(0.02)
                     else:
-                        # Grace period: allow up to 10 seconds for phone HTTP stream to connect
+                        # Grace period: allow up to 25 seconds for phone HTTP stream to connect
                         # before declaring the source unreachable (WiFi handshake + MJPEG negotiate)
                         seconds_since_configure = time.time() - self.last_configure_time
-                        if seconds_since_configure < 10.0:
+                        if seconds_since_configure < 25.0:
                             self.status = "CONNECTING"
                             self.error_message = ""
                             frame_bgr, detections = self.synthetic_gen.generate_frame()
@@ -1369,3 +1565,128 @@ class VideoIngestionService:
         frame_bgr, _ = worker.synthetic_gen.generate_frame()
         ret, buf = cv2.imencode(".jpg", frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 80])
         return buf.tobytes() if ret else None
+
+    @staticmethod
+    def get_network_info() -> Dict[str, Any]:
+        """Detects the host machine's primary local IP and Wi-Fi subnet for smartphone camera configuration."""
+        local_ip = "127.0.0.1"
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(0.5)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+        except Exception:
+            try:
+                local_ip = socket.gethostbyname(socket.gethostname())
+            except Exception:
+                local_ip = "127.0.0.1"
+
+        parts = local_ip.split(".")
+        subnet = ".".join(parts[:3]) if len(parts) == 4 else "192.168.0"
+
+        return {
+            "local_ip": local_ip,
+            "subnet": subnet,
+            "common_ports": [8080, 4747, 8554],
+            "sample_url": f"http://{subnet}.xxx:8080/video",
+            "recommended_apps": [
+                {"name": "IP Webcam (Android)", "default_port": 8080, "endpoint": "/video"},
+                {"name": "DroidCam (Android/iOS)", "default_port": 4747, "endpoint": "/mjpegfeed"},
+                {"name": "Live-Reporter / IP Camera Lite (iOS)", "default_port": 8080, "endpoint": "/live"}
+            ]
+        }
+
+    @staticmethod
+    def probe_phone_stream(target_url: str) -> Dict[str, Any]:
+        """
+        Actively diagnoses connection to a smartphone stream URL.
+        Tests TCP socket, checks common ports (8080, 4747, 80), probes MJPEG/snapshot endpoints,
+        measures response latency, and returns clear actionable diagnostics.
+        """
+        url = (target_url or "").strip()
+        if not url:
+            return {"reachable": False, "error": "No URL or IP provided."}
+
+        if not url.startswith(("http://", "https://", "rtsp://")):
+            url = "http://" + url
+
+        try:
+            parsed = urllib.parse.urlsplit(url)
+        except Exception as e:
+            return {"reachable": False, "error": f"Invalid URL syntax: {e}"}
+
+        host = parsed.hostname or ""
+        port = parsed.port
+        path = parsed.path or ""
+
+        if not host:
+            return {"reachable": False, "error": f"Invalid host in URL: '{target_url}'"}
+
+        test_ports = [port] if port else [8080, 4747, 80]
+        active_port = None
+        t0 = time.time()
+
+        for p in test_ports:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(1.2)
+            try:
+                res = s.connect_ex((host, p))
+                if res == 0:
+                    active_port = p
+                    break
+            except Exception:
+                pass
+            finally:
+                s.close()
+
+        if active_port is None:
+            tested_str = f":{port}" if port else "ports 8080, 4747, or 80"
+            return {
+                "reachable": False,
+                "host": host,
+                "error": f"Cannot reach {host} on {tested_str}. Ensure your phone is on the same Wi-Fi and 'Start Server' is running in the camera app.",
+                "hint": "In IP Webcam, scroll down and tap 'Start server' to begin broadcasting."
+            }
+
+        latency_ms = round((time.time() - t0) * 1000, 1)
+        base = f"{parsed.scheme}://{host}:{active_port}"
+        candidate_paths = [path] if path and path not in ("/", "") else ["/video", "/videofeed", "/shot.jpg", "/mjpegfeed", "/live", "/"]
+        
+        ssl_ctx = ssl._create_unverified_context()
+        found_url = None
+        service_type = "IP Camera Feed"
+
+        for c_path in candidate_paths:
+            probe_cand = base + c_path
+            req = urllib.request.Request(probe_cand, headers={'User-Agent': 'UrbanTwinAI/2.0 Probe'})
+            try:
+                with urllib.request.urlopen(req, timeout=1.8, context=ssl_ctx) as resp:
+                    if resp.status in (200, 204, 206):
+                        found_url = probe_cand
+                        ct = resp.headers.get('Content-Type', '').lower()
+                        if 'multipart' in ct or 'video' in ct:
+                            service_type = "MJPEG Live Stream"
+                        elif 'image' in ct:
+                            service_type = "JPEG Snapshot Feed"
+                        break
+            except urllib.error.HTTPError as he:
+                if he.code == 401:
+                    found_url = probe_cand
+                    service_type = "Password-Protected Stream (Auth Required)"
+                    break
+            except Exception:
+                continue
+
+        if not found_url:
+            found_url = f"{base}/video"
+
+        return {
+            "reachable": True,
+            "host": host,
+            "port": active_port,
+            "resolved_url": found_url,
+            "service_type": service_type,
+            "latency_ms": latency_ms,
+            "message": f"Successfully reached {host}:{active_port} ({service_type}, {latency_ms}ms)!"
+        }

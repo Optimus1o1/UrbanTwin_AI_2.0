@@ -2093,8 +2093,16 @@
                   <label class="block text-[11px] font-mono text-white/80 font-semibold">Smartphone IP Webcam Stream URL:</label>
                   <span class="text-[9px] text-white/40 font-mono">Android (IP Webcam) / iOS</span>
                 </div>
+                <div id="net-badge-CAM_01" class="text-[10px] font-mono text-cyan-300 bg-cyan-950/40 border border-cyan-800/40 rounded-lg px-2.5 py-1 flex items-center justify-between">
+                  <span><i class="fa-solid fa-wifi mr-1 text-cyan-400"></i>Laptop Wi-Fi: 192.168.0.104 (Subnet 192.168.0.x)</span>
+                  <span class="text-white/40">Phone must match this Wi-Fi</span>
+                </div>
                 <div class="flex space-x-1.5">
-                  <input type="text" id="input-phone-CAM_01" value="http://192.168.1.105:8080/video" placeholder="http://192.168.1.105:8080/video" class="flex-1 bg-white/[0.03] border border-white/15 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white select-all" />
+                  <input type="text" id="input-phone-CAM_01" value="http://192.168.0.117:8080/video" placeholder="http://192.168.0.xxx:8080/video" class="flex-1 bg-white/[0.03] border border-white/15 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white select-all" />
+                  <button id="btn-test-CAM_01" type="button" onclick="testPhoneFeed('CAM_01')" class="px-3 py-2 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl text-xs transition flex items-center space-x-1 shrink-0 border border-white/15 shadow-sm" title="Test if phone camera is broadcasting before connecting">
+                    <i class="fa-solid fa-vial text-xs"></i>
+                    <span>Test Feed</span>
+                  </button>
                   <button id="btn-connect-CAM_01" onclick="connectPhoneFeed('CAM_01')" class="px-4 py-2 bg-white text-black hover:bg-white/90 font-bold rounded-xl text-xs transition flex items-center space-x-1.5 shrink-0 shadow-sm">
                     <i class="fa-solid fa-link text-xs"></i>
                     <span>Connect</span>
@@ -2106,15 +2114,17 @@
                   <span class="text-white/40">Quick Fill:</span>
                   <button type="button" onclick="document.getElementById('input-phone-CAM_01').value='http://192.168.0.117:8080/video'" class="px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono">My Phone (192.168.0.117)</button>
                   <button type="button" onclick="document.getElementById('input-phone-CAM_01').value='http://192.168.43.1:8080/video'" class="px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono">Hotspot (192.168.43.1)</button>
-                  <button type="button" onclick="document.getElementById('input-phone-CAM_01').value='http://192.168.1.15:8080/video'" class="px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono">Wi-Fi (192.168.1.15)</button>
+                  <button type="button" onclick="document.getElementById('input-phone-CAM_01').value='http://192.168.0.117:4747/mjpegfeed'" class="px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono">DroidCam (:4747)</button>
+                  <button type="button" onclick="document.getElementById('input-phone-CAM_01').value='http://192.168.0.117:8080/shot.jpg'" class="px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono">Snapshot (:8080/shot.jpg)</button>
                 </div>
                 <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10 text-[10px] text-white/70 space-y-1">
                   <div class="font-bold flex items-center space-x-1 text-white">
                     <i class="fa-solid fa-bolt text-white/70"></i>
-                    <span>Tips for Real-Time Zero-Lag (&lt;50ms):</span>
+                    <span>Connecting Android (IP Webcam) or iOS:</span>
                   </div>
-                  <p>• In the phone's <b>IP Webcam</b> app &gt; <b>Video preferences</b>: set <b>Video resolution</b> to <b>1280x720</b> or <b>960x720</b> (avoids 1080p Wi-Fi buffer bloat).</p>
-                  <p>• Set <b>Quality</b> to <b>50%</b>. UrbanTwin's bufferless capture engine continuously purges stale socket queues.</p>
+                  <p>• <b>Step 1</b>: In the phone's <b>IP Webcam</b> app, scroll all the way to the bottom and tap <b>"Start server"</b>.</p>
+                  <p>• <b>Step 2</b>: Enter the exact IP shown on the phone screen (e.g. <code>http://192.168.0.xxx:8080</code>). Click <b>Test Feed</b> to verify.</p>
+                  <p>• In <b>Video preferences</b>, set resolution to <b>1280x720</b> or <b>960x720</b> and Quality to <b>50%</b> for zero lag.</p>
                 </div>
               </div>
 
@@ -2247,8 +2257,16 @@
                   <label class="block text-[11px] font-mono text-white/80 font-semibold">Smartphone IP Webcam Stream URL:</label>
                   <span class="text-[9px] text-white/40 font-mono">Android (IP Webcam) / iOS</span>
                 </div>
+                <div id="net-badge-CAM_02" class="text-[10px] font-mono text-cyan-300 bg-cyan-950/40 border border-cyan-800/40 rounded-lg px-2.5 py-1 flex items-center justify-between">
+                  <span><i class="fa-solid fa-wifi mr-1 text-cyan-400"></i>Laptop Wi-Fi: 192.168.0.104 (Subnet 192.168.0.x)</span>
+                  <span class="text-white/40">Phone must match this Wi-Fi</span>
+                </div>
                 <div class="flex space-x-1.5">
-                  <input type="text" id="input-phone-CAM_02" value="http://192.168.1.106:8080/video" placeholder="http://192.168.1.106:8080/video" class="flex-1 bg-white/[0.03] border border-white/15 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white select-all" />
+                  <input type="text" id="input-phone-CAM_02" value="http://192.168.0.117:8080/video" placeholder="http://192.168.0.xxx:8080/video" class="flex-1 bg-white/[0.03] border border-white/15 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white select-all" />
+                  <button id="btn-test-CAM_02" type="button" onclick="testPhoneFeed('CAM_02')" class="px-3 py-2 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl text-xs transition flex items-center space-x-1 shrink-0 border border-white/15 shadow-sm" title="Test if phone camera is broadcasting before connecting">
+                    <i class="fa-solid fa-vial text-xs"></i>
+                    <span>Test Feed</span>
+                  </button>
                   <button id="btn-connect-CAM_02" onclick="connectPhoneFeed('CAM_02')" class="px-4 py-2 bg-white text-black hover:bg-white/90 font-bold rounded-xl text-xs transition flex items-center space-x-1.5 shrink-0 shadow-sm">
                     <i class="fa-solid fa-link text-xs"></i>
                     <span>Connect</span>
@@ -2260,15 +2278,17 @@
                   <span class="text-white/40">Quick Fill:</span>
                   <button type="button" onclick="document.getElementById('input-phone-CAM_02').value='http://192.168.0.117:8080/video'" class="px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono">My Phone (192.168.0.117)</button>
                   <button type="button" onclick="document.getElementById('input-phone-CAM_02').value='http://192.168.43.1:8080/video'" class="px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono">Hotspot (192.168.43.1)</button>
-                  <button type="button" onclick="document.getElementById('input-phone-CAM_02').value='http://192.168.1.15:8080/video'" class="px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono">Wi-Fi (192.168.1.15)</button>
+                  <button type="button" onclick="document.getElementById('input-phone-CAM_02').value='http://192.168.0.117:4747/mjpegfeed'" class="px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono">DroidCam (:4747)</button>
+                  <button type="button" onclick="document.getElementById('input-phone-CAM_02').value='http://192.168.0.117:8080/shot.jpg'" class="px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono">Snapshot (:8080/shot.jpg)</button>
                 </div>
                 <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10 text-[10px] text-white/70 space-y-1">
                   <div class="font-bold flex items-center space-x-1 text-white">
                     <i class="fa-solid fa-bolt text-white/70"></i>
-                    <span>Tips for Real-Time Zero-Lag (&lt;50ms):</span>
+                    <span>Connecting Android (IP Webcam) or iOS:</span>
                   </div>
-                  <p>• In the phone's <b>IP Webcam</b> app &gt; <b>Video preferences</b>: set <b>Video resolution</b> to <b>1280x720</b> or <b>960x720</b> (avoids 1080p Wi-Fi buffer bloat).</p>
-                  <p>• Set <b>Quality</b> to <b>50%</b>. UrbanTwin's bufferless capture engine continuously purges stale socket queues.</p>
+                  <p>• <b>Step 1</b>: In the phone's <b>IP Webcam</b> app, scroll all the way to the bottom and tap <b>"Start server"</b>.</p>
+                  <p>• <b>Step 2</b>: Enter the exact IP shown on the phone screen (e.g. <code>http://192.168.0.xxx:8080</code>). Click <b>Test Feed</b> to verify.</p>
+                  <p>• In <b>Video preferences</b>, set resolution to <b>1280x720</b> or <b>960x720</b> and Quality to <b>50%</b> for zero lag.</p>
                 </div>
               </div>
 

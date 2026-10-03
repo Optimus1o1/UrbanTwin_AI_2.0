@@ -367,3 +367,34 @@ def test_camera_recognized_vehicles_endpoint():
 
     res_after = client.get("/api/v1/cameras/CAM_01/recognized_vehicles")
     assert res_after.json()["total_recognized"] == 0
+
+def test_camera_network_info_endpoint():
+    """Validates GET /api/v1/cameras/network_info returns local IP and subnet guidance."""
+    res = client.get("/api/v1/cameras/network_info")
+    assert res.status_code == 200
+    data = res.json()
+    assert "local_ip" in data
+    assert "subnet" in data
+    assert "common_ports" in data
+    assert 8080 in data["common_ports"]
+    assert "sample_url" in data
+
+def test_camera_probe_phone_endpoint():
+    """Validates POST /api/v1/cameras/probe_phone diagnoses unreachable vs responsive smartphone endpoints."""
+    # 1. Test invalid / unreachable IP
+    res = client.post("/api/v1/cameras/probe_phone", json={
+        "url": "http://192.0.2.1:8080/video",  # RFC 5737 TEST-NET-1 (unreachable)
+        "camera_id": "CAM_01"
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["reachable"] is False
+    assert "error" in data
+
+    # 2. Test empty URL
+    res_empty = client.post("/api/v1/cameras/probe_phone", json={
+        "url": "",
+        "camera_id": "CAM_01"
+    })
+    assert res_empty.status_code == 200
+    assert res_empty.json()["reachable"] is False

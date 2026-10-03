@@ -2799,6 +2799,90 @@ window.snapPlateFromWebcam = async function (camId = 'CAM_01') {
 };
 
 
+window.normalizePhoneUrl = function(rawUrl) {
+  let url = (rawUrl || '').trim();
+  if (!url) return '';
+  if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('rtsp://')) {
+    url = 'http://' + url;
+  }
+  try {
+    const u = new URL(url);
+    // If user provided a plain IP without port, default to 8080 (IP Webcam)
+    if (!u.port && /^\d+\.\d+\.\d+\.\d+$/.test(u.hostname)) {
+      u.port = '8080';
+    }
+    // Only append /video if pathname is empty or root '/'
+    if (!u.pathname || u.pathname === '/') {
+      u.pathname = '/video';
+    }
+    return u.toString();
+  } catch (_) {
+    if (!url.includes('/video') && !url.includes('/videofeed') && !url.includes('.mjpg') && !url.includes('.jpg') && !url.includes('/live')) {
+      url = url.replace(/\/+$/, '') + '/video';
+    }
+    return url;
+  }
+};
+
+window.testPhoneFeed = async function (camId) {
+  const input = document.getElementById(`input-phone-${camId}`);
+  const statusEl = document.getElementById(`status-phone-${camId}`);
+  const btnTest = document.getElementById(`btn-test-${camId}`);
+
+  let url = input ? input.value.trim() : "";
+  if (!url && input && input.placeholder) {
+    url = input.placeholder.trim();
+    if (input) input.value = url;
+  }
+
+  if (!url) {
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Please enter a phone IP (e.g. 192.168.0.xxx:8080)</span>`;
+    }
+    return;
+  }
+
+  url = window.normalizePhoneUrl(url);
+  if (input) input.value = url;
+
+  if (btnTest) {
+    btnTest.disabled = true;
+    btnTest.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i>Testing...`;
+  }
+  if (statusEl) {
+    statusEl.innerHTML = `<span class="text-amber-400"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i>Pinging phone camera at <code class="bg-black/50 px-1 py-0.5 rounded text-white">${url}</code>...</span>`;
+  }
+
+  try {
+    const res = await fetch('/api/v1/cameras/probe_phone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, camera_id: camId })
+    });
+    const data = await res.json();
+    if (data.reachable) {
+      if (input && data.resolved_url) input.value = data.resolved_url;
+      if (statusEl) {
+        statusEl.innerHTML = `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-circle-check mr-1"></i>FEED FOUND! ${data.service_type} (${data.latency_ms}ms). Click 'Connect' to stream!</span>`;
+      }
+      if (window.playAudioCue) window.playAudioCue('action');
+    } else {
+      if (statusEl) {
+        statusEl.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${data.error || 'Phone unreachable'} ${data.hint ? `<span class="text-white/60 block mt-0.5">${data.hint}</span>` : ''}</span>`;
+      }
+    }
+  } catch (err) {
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-xmark mr-1"></i>Diagnostic error: ${err.message}</span>`;
+    }
+  } finally {
+    if (btnTest) {
+      btnTest.disabled = false;
+      btnTest.innerHTML = `<i class="fa-solid fa-vial mr-1"></i>Test Feed`;
+    }
+  }
+};
+
 window.connectPhoneFeed = async function (camId) {
   const input = document.getElementById(`input-phone-${camId}`);
   const statusEl = document.getElementById(`status-phone-${camId}`);
@@ -2813,20 +2897,13 @@ window.connectPhoneFeed = async function (camId) {
 
   if (!url) {
     if (statusEl) {
-      statusEl.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Please enter an IP address (e.g. 192.168.1.50:8080)</span>`;
+      statusEl.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Please enter an IP address (e.g. 192.168.0.xxx:8080)</span>`;
     }
     return;
   }
 
-  // Auto-normalize protocol and stream endpoint
-  if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('rtsp://')) {
-    url = 'http://' + url;
-  }
-  // If user only typed IP and port (e.g. http://192.168.1.15:8080), append /video for IP Webcam
-  if (!url.includes('/video') && !url.includes('/videofeed') && !url.includes('.mjpg') && !url.startsWith('rtsp://')) {
-    url = url.replace(/\/+$/, '') + '/video';
-  }
-
+  // Normalize URL intelligently
+  url = window.normalizePhoneUrl(url);
   if (input) input.value = url;
 
   if (btnConnect) {
@@ -2834,7 +2911,7 @@ window.connectPhoneFeed = async function (camId) {
     btnConnect.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i>Connecting...`;
   }
   if (statusEl) {
-    statusEl.innerHTML = `<span class="text-amber-400"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i>Contacting stream at <code class="bg-black/50 px-1 py-0.5 rounded text-white">${url}</code>...</span>`;
+    statusEl.innerHTML = `<span class="text-amber-400"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i>Negotiating stream with <code class="bg-black/50 px-1 py-0.5 rounded text-white">${url}</code>...</span>`;
   }
   if (modeLabel) modeLabel.textContent = `Connecting to ${url}...`;
 
@@ -2847,16 +2924,16 @@ window.connectPhoneFeed = async function (camId) {
     const data = await res.json();
     
     if (statusEl) {
-      statusEl.innerHTML = `<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-check mr-1"></i>Pipeline set to <b class="text-white">${url}</b>! Connecting feed...</span>`;
+      statusEl.innerHTML = `<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-satellite-dish mr-1"></i>Pipeline locked onto <b class="text-white">${url}</b>! Awaiting frames...</span>`;
     }
     if (modeLabel) modeLabel.textContent = `Active: Phone IP (${data.status})`;
     
     refreshStreamImage(camId);
     if (window.playAudioCue) window.playAudioCue('action');
 
-    // Active periodic polling to verify phone stream connectivity
+    // Resilient periodic polling with up to 15 attempts (18-20s grace period)
     let attempts = 0;
-    const maxAttempts = 8;
+    const maxAttempts = 15;
     const checkStreamInterval = setInterval(async () => {
       attempts++;
       try {
@@ -2871,12 +2948,12 @@ window.connectPhoneFeed = async function (camId) {
               if (modeLabel) modeLabel.textContent = `Active: Phone IP (STREAMING)`;
               refreshStreamImage(camId);
               return;
-            } else if (cur.status === 'SOURCE_UNREACHABLE') {
+            } else if (cur.status === 'SOURCE_UNREACHABLE' && attempts >= 10) {
               clearInterval(checkStreamInterval);
-              statusEl.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Phone unreachable at ${url}. Check IP Webcam server is running & on same Wi-Fi!</span>`;
+              statusEl.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Phone unreachable at ${url}. Tap 'Test Feed' or ensure IP Webcam server is running & on same Wi-Fi!</span>`;
               if (modeLabel) modeLabel.textContent = `Phone Unreachable (${url})`;
               return;
-            } else if (cur.status === 'CONNECTING') {
+            } else {
               statusEl.innerHTML = `<span class="text-amber-400"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i>Connecting to phone (${attempts}/${maxAttempts})... Handshake in progress</span>`;
             }
           }
@@ -2899,6 +2976,25 @@ window.connectPhoneFeed = async function (camId) {
       btnConnect.innerHTML = `<i class="fa-solid fa-link mr-1"></i>Connect`;
     }
   }
+};
+
+window.initPhoneNetworkInfo = async function() {
+  try {
+    const res = await fetch('/api/v1/cameras/network_info');
+    if (!res.ok) return;
+    const data = await res.json();
+    ['CAM_01', 'CAM_02'].forEach(camId => {
+      const input = document.getElementById(`input-phone-${camId}`);
+      if (input && (!input.value || input.value.includes('192.168.1.105') || input.value.includes('192.168.1.106'))) {
+        input.value = `http://${data.subnet}.117:8080/video`;
+        input.placeholder = `http://${data.subnet}.xxx:8080/video`;
+      }
+      const netBadge = document.getElementById(`net-badge-${camId}`);
+      if (netBadge) {
+        netBadge.textContent = `Laptop Wi-Fi: ${data.local_ip} (Subnet: ${data.subnet}.x)`;
+      }
+    });
+  } catch (_) {}
 };
 
 window.loadSampleVideo = async function (camId, sampleName) {
@@ -3266,5 +3362,6 @@ if (!streamPollingTimer) {
 // Initial status load
 setTimeout(() => {
   if (window.loadStreamStatuses) window.loadStreamStatuses();
+  if (window.initPhoneNetworkInfo) window.initPhoneNetworkInfo();
 }, 400);
 

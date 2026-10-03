@@ -39,7 +39,27 @@ def get_ocr_benchmark_matrix(request: Request, plate: Optional[str] = "WB02AK492
     (Clean, Rain, Night Glare, Motion Blur, 45° Oblique Angle Skew, Mud Grime)
     and verifies whether all conditions pass the >=90% SLA threshold.
     """
-    return anpr_service.run_full_ocr_benchmark_matrix(plate_text=plate)
+class PhoneProbeRequest(BaseModel):
+    url: str
+    camera_id: Optional[str] = "CAM_01"
+
+@router.get("/network_info", response_model=Dict[str, Any])
+@limiter.limit("60/minute")
+def get_network_info(request: Request):
+    """
+    Returns the host machine's primary local IP, Wi-Fi subnet, and recommended camera app ports
+    to assist operators in configuring smartphone IP webcam feeds.
+    """
+    return VideoIngestionService.get_network_info()
+
+@router.post("/probe_phone", response_model=Dict[str, Any])
+@limiter.limit("60/minute")
+def probe_phone_camera(request: Request, body: PhoneProbeRequest):
+    """
+    Actively probes and diagnoses smartphone camera stream connectivity (IP Webcam / DroidCam / RTSP).
+    Verifies port reachability and detects MJPEG or JPEG snapshot streams before configuring pipeline.
+    """
+    return VideoIngestionService.probe_phone_stream(body.url)
 
 @router.get("/{camera_id}", response_model=Camera)
 @limiter.limit("60/minute")
