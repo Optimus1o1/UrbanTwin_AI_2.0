@@ -1749,35 +1749,62 @@
 
       </div>
 
-      <!-- REAL-TIME CROSS-CAMERA ANPR DETECTION FEED -->
-      <div class="glass-card p-5 border border-slate-800 space-y-4">
-        <div class="flex flex-wrap items-center justify-between pb-3 border-b border-slate-800 gap-2">
-          <div class="flex items-center space-x-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
-            <h4 class="font-bold text-white text-sm brand-font">Real-Time Ingestion ANPR Log &amp; Multi-Parameter Recognition</h4>
+      <!-- LIVE RECOGNIZED VEHICLES & PLATES LOG PANEL -->
+      <div class="glass-card p-5 border border-cyan-500/30 space-y-4 glow-cyan">
+        <div class="flex flex-wrap items-center justify-between pb-3 border-b border-slate-800 gap-3">
+          <div class="flex items-center space-x-2.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <div>
+              <h4 class="font-bold text-white text-sm brand-font flex items-center space-x-2">
+                <i class="fa-solid fa-id-card-clip text-cyan-400"></i>
+                <span>Live Recognized Vehicles &amp; Plates Log</span>
+              </h4>
+              <p class="text-[11px] text-gray-400 font-mono">Real-time edge ANPR telemetry with HSRP plate validation</p>
+            </div>
           </div>
-          <span class="text-xs text-gray-400 font-mono">Syncing with Central Kolkata Traffic Digital Twin</span>
+          
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Filter Pills -->
+            <div class="flex items-center space-x-1 bg-slate-900/90 p-1 rounded-lg border border-slate-800 text-[11px] font-mono">
+              <button id="btn-filter-cam-all" onclick="setRecognizedVehiclesFilter('ALL')" class="px-2.5 py-1 rounded bg-cyan-600/40 text-cyan-300 font-bold border border-cyan-500/40 transition">All Feeds</button>
+              <button id="btn-filter-cam-cam01" onclick="setRecognizedVehiclesFilter('CAM_01')" class="px-2.5 py-1 rounded text-gray-400 hover:text-white transition">CAM_01</button>
+              <button id="btn-filter-cam-cam02" onclick="setRecognizedVehiclesFilter('CAM_02')" class="px-2.5 py-1 rounded text-gray-400 hover:text-white transition">CAM_02</button>
+            </div>
+
+            <!-- Action Buttons -->
+            <button onclick="exportRecognizedVehiclesCSV()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/40 rounded-lg text-xs font-mono font-bold transition flex items-center space-x-1.5 shadow-sm">
+              <i class="fa-solid fa-file-csv text-emerald-400"></i>
+              <span>Export CSV</span>
+            </button>
+            <button onclick="clearRecognizedVehiclesLog()" class="px-3 py-1.5 bg-slate-800 hover:bg-rose-950/60 text-gray-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 rounded-lg text-xs font-mono transition flex items-center space-x-1.5">
+              <i class="fa-solid fa-trash-can text-rose-400"></i>
+              <span>Clear Log</span>
+            </button>
+          </div>
         </div>
 
         <!-- Live Stream Telemetry KPI Strip -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
           <div class="bg-slate-900/90 border border-cyan-500/20 rounded-xl p-3">
             <div class="text-[10px] font-mono text-gray-400 flex items-center justify-between">
-              <span>ACTIVE DETECTIONS</span>
+              <span>TOTAL RECOGNIZED</span>
               <i class="fa-solid fa-car text-cyan-400"></i>
             </div>
-            <div class="text-lg font-bold font-mono text-cyan-300 mt-1" id="telemetry-live-active-count">0 Targets</div>
+            <div class="text-lg font-bold font-mono text-cyan-300 mt-1 flex items-center space-x-1.5">
+              <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+              <span id="telemetry-live-active-count">0 Vehicles</span>
+            </div>
           </div>
           <div class="bg-slate-900/90 border border-amber-500/20 rounded-xl p-3">
             <div class="text-[10px] font-mono text-gray-400 flex items-center justify-between">
-              <span>FLOW SPEED</span>
+              <span>AVG FLOW SPEED</span>
               <i class="fa-solid fa-gauge-high text-amber-400"></i>
             </div>
             <div class="text-lg font-bold font-mono text-amber-300 mt-1" id="telemetry-live-avg-speed">48.2 km/h</div>
           </div>
           <div class="bg-slate-900/90 border border-emerald-500/20 rounded-xl p-3">
             <div class="text-[10px] font-mono text-gray-400 flex items-center justify-between">
-              <span>ANPR MATCH ACCURACY</span>
+              <span>ANPR MATCH CONFIDENCE</span>
               <i class="fa-solid fa-bullseye text-emerald-400"></i>
             </div>
             <div class="text-lg font-bold font-mono text-emerald-300 mt-1" id="telemetry-live-avg-conf">96.4%</div>
@@ -1791,23 +1818,24 @@
           </div>
         </div>
 
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
           <table class="w-full text-left text-xs font-mono">
-            <thead class="bg-slate-900/80 text-gray-400 uppercase text-[10px] border-b border-slate-800">
+            <thead class="bg-slate-900/90 text-gray-400 uppercase text-[10px] border-b border-slate-800">
               <tr>
                 <th class="py-2.5 px-3">Camera Node</th>
                 <th class="py-2.5 px-3">Timestamp</th>
-                <th class="py-2.5 px-3">License Plate</th>
+                <th class="py-2.5 px-3">License Plate (HSRP)</th>
                 <th class="py-2.5 px-3">Vehicle Class</th>
                 <th class="py-2.5 px-3">Body Color</th>
                 <th class="py-2.5 px-3">Speed Estimate</th>
-                <th class="py-2.5 px-3">Lane Assignment</th>
+                <th class="py-2.5 px-3">Lane</th>
                 <th class="py-2.5 px-3">OCR Confidence</th>
+                <th class="py-2.5 px-3">Verification</th>
                 <th class="py-2.5 px-3 text-right">Digital Twin Action</th>
               </tr>
             </thead>
-            <tbody id="stream-detections-table-body" class="divide-y divide-slate-800/60">
-              <!-- Dynamically populated from /streams/status -->
+            <tbody id="stream-detections-table-body" class="divide-y divide-slate-800/60 bg-slate-950/40">
+              <!-- Dynamically populated from /cameras/{id}/recognized_vehicles -->
             </tbody>
           </table>
         </div>

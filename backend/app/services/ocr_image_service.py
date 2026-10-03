@@ -37,9 +37,9 @@ _OCR_LOCK = threading.Lock()
 
 # Indian States & Union Territories codes
 INDIAN_STATES = {
-    'AP', 'AR', 'AS', 'BR', 'CG', 'CH', 'DD', 'DL', 'DN', 'GA', 'GJ', 'HP', 'HR',
-    'JH', 'JK', 'KA', 'KL', 'LA', 'LD', 'MH', 'ML', 'MN', 'MP', 'MZ', 'NL', 'OD',
-    'PB', 'PY', 'RJ', 'SK', 'TN', 'TR', 'TS', 'UK', 'UP', 'WB'
+    'AN', 'AP', 'AR', 'AS', 'BR', 'CG', 'CH', 'DD', 'DL', 'DN', 'GA', 'GJ', 'HP', 'HR',
+    'JH', 'JK', 'KA', 'KL', 'LA', 'LD', 'MH', 'ML', 'MN', 'MP', 'MZ', 'NL', 'OD', 'OR',
+    'PB', 'PY', 'RJ', 'SK', 'TG', 'TN', 'TR', 'TS', 'UK', 'UP', 'UT', 'WB'
 }
 
 NON_PLATE_WORDS = {
@@ -227,10 +227,28 @@ def _disambiguate_plate_text(candidate: str) -> str:
                 elif chars[idx] in ALPHA_TO_DIGIT:
                     chars[idx] = ALPHA_TO_DIGIT[chars[idx]]
 
-        # Short single-digit RTO plates like DL4C1234 (7 or 8 chars)
-        elif len(chars) >= 7 and chars[2].isdigit():
-            # Last 4 digits
+        # Short single-digit RTO plates like DL4C1234 or WB021234 (8 chars)
+        elif len(chars) == 8:
+            if chars[2] in ALPHA_TO_DIGIT:
+                chars[2] = ALPHA_TO_DIGIT[chars[2]]
+            if chars[3].isalpha() or chars[3] in DIGIT_TO_ALPHA:
+                chars[3] = DIGIT_TO_ALPHA.get(chars[3], chars[3])
+            elif chars[3] in ALPHA_TO_DIGIT:
+                chars[3] = ALPHA_TO_DIGIT[chars[3]]
+
+            # Registration digits (last 4) MUST be digits
             for idx in range(len(chars) - 4, len(chars)):
+                if chars[idx] in ('O', 'D', 'Q'):
+                    chars[idx] = '0'
+                elif chars[idx] in ALPHA_TO_DIGIT:
+                    chars[idx] = ALPHA_TO_DIGIT[chars[idx]]
+
+        # Short single-digit RTO plates like DL4C123 or similar (>= 7 chars)
+        elif len(chars) >= 7:
+            if chars[2] in ALPHA_TO_DIGIT:
+                chars[2] = ALPHA_TO_DIGIT[chars[2]]
+            # Last 4 digits (or trailing digits)
+            for idx in range(max(3, len(chars) - 4), len(chars)):
                 if chars[idx] in ('O', 'D', 'Q'):
                     chars[idx] = '0'
                 elif chars[idx] in ALPHA_TO_DIGIT:
@@ -480,8 +498,9 @@ def localize_plate_candidates(img_rgb: np.ndarray) -> List[Tuple[np.ndarray, Tup
 
 def _normalize_crop_dimensions(crop_rgb: np.ndarray) -> np.ndarray:
     """
-    Upscales small plate crops to optimal ANPR height (80-120px) using bicubic interpolation.
-    Downscales massive crops (>1400px) to prevent memory bottlenecks.
+    Upscales small plate crops to optimal ANPR height (90-110px) using Lanczos-4 interpolation
+    and applies unsharp edge masking to emphasize embossed character boundaries.
+    Downscales massive crops (>1200px) to prevent memory bottlenecks.
     """
     if cv2 is None:
         return crop_rgb
@@ -491,10 +510,16 @@ def _normalize_crop_dimensions(crop_rgb: np.ndarray) -> np.ndarray:
         crop_rgb = cv2.copyMakeBorder(crop_rgb, 8, 8, 14, 14, cv2.BORDER_CONSTANT, value=[255, 255, 255])
         ch, cw = crop_rgb.shape[:2]
 
-    if ch < 80:
-        scale = 95.0 / max(1, ch)
-        new_w = max(140, int(cw * scale))
-        return cv2.resize(crop_rgb, (new_w, 95), interpolation=cv2.INTER_CUBIC)
+    if ch < 90:
+        scale = 105.0 / max(1, ch)
+        new_w = max(160, int(cw * scale))
+        upscaled = cv2.resize(crop_rgb, (new_w, 105), interpolation=cv2.INTER_LANCZOS4)
+        try:
+            gaussian = cv2.GaussianBlur(upscaled, (0, 0), 1.8)
+            sharpened = cv2.addWeighted(upscaled, 1.38, gaussian, -0.38, 0)
+            return sharpened
+        except Exception:
+            return upscaled
     elif max(ch, cw) > 1200:
         scale = 1100.0 / max(ch, cw)
         new_w = max(100, int(cw * scale))
@@ -506,33 +531,34 @@ def _normalize_crop_dimensions(crop_rgb: np.ndarray) -> np.ndarray:
 def _enhance_crop_variants(crop_rgb: np.ndarray) -> List[np.ndarray]:
     """
     Produces enhancement representations for plate crop:
-    1. Normalized RGB
-    2. CLAHE contrast equalization (for shadowed or glare-affected plates)
-    3. Otsu high-contrast binarization (for paper-written numbers and faint plates)
-    4. Adaptive Gaussian thresholding (for gradient shadows on handheld paper)
+    1. CLAHE contrast equalization (Primary ANPR variant - optimal for vehicle plates)
+    2. Normalized RGB (Natural color baseline)
+    3. Adaptive Gaussian thresholding (for gradient shadows on handheld paper)
+    4. Otsu high-contrast binarization (for paper-written numbers and faint plates)
     """
     normalized = _normalize_crop_dimensions(crop_rgb)
-    variants = [normalized]
+    variants = []
     if cv2 is None:
-        return variants
+        return [normalized]
 
     try:
         gray = cv2.cvtColor(normalized, cv2.COLOR_RGB2GRAY)
         clahe = cv2.createCLAHE(clipLimit=2.2, tileGridSize=(8, 8))
         clahe_enhanced = clahe.apply(gray)
+        # 1. CLAHE enhanced (Primary for reflective vehicle plates)
         variants.append(cv2.cvtColor(clahe_enhanced, cv2.COLOR_GRAY2RGB))
-
-        # Otsu threshold variant: dramatically boosts pen/pencil contrast against paper
-        _, otsu_bin = cv2.threshold(clahe_enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        variants.append(cv2.cvtColor(otsu_bin, cv2.COLOR_GRAY2RGB))
-
-        # Adaptive Gaussian threshold variant: handles gradient shadows on paper/plates
+        # 2. Normalized RGB
+        variants.append(normalized)
+        # 3. Adaptive Gaussian threshold variant: handles gradient shadows on paper/plates
         adaptive_bin = cv2.adaptiveThreshold(
             clahe_enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 25, 9
         )
         variants.append(cv2.cvtColor(adaptive_bin, cv2.COLOR_GRAY2RGB))
+        # 4. Otsu threshold variant: dramatically boosts pen/pencil contrast against paper
+        _, otsu_bin = cv2.threshold(clahe_enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        variants.append(cv2.cvtColor(otsu_bin, cv2.COLOR_GRAY2RGB))
     except Exception:
-        pass
+        variants = [normalized]
 
     return variants
 
@@ -680,7 +706,12 @@ def recognize_plate_from_array(
 
             for var_idx, variant in enumerate(variants):
                 try:
-                    ocr_results = reader.readtext(variant)
+                    ocr_results = reader.readtext(
+                        variant,
+                        allowlist='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+                        paragraph=False,
+                        batch_size=1
+                    )
                     if not ocr_results:
                         continue
 
@@ -750,10 +781,10 @@ def recognize_plate_from_array(
                                         'bbox': bbox
                                     })
 
-                    # FAST-PATH EARLY EXIT: If confident plate found (score >= 1.5 and len >= 4), stop immediately!
+                    # FAST-PATH EARLY EXIT: If confident plate found on primary CLAHE variant, stop immediately!
                     top_matches = [
                         c for c in scored_candidates
-                        if (c['score'] >= 1.5 and len(c['plate']) >= 4)
+                        if (c['score'] >= 1.8 and len(c['plate']) >= 4) or (var_idx == 0 and c['score'] >= 1.5 and len(c['plate']) >= 4)
                     ]
                     if top_matches:
                         break
@@ -761,7 +792,8 @@ def recognize_plate_from_array(
                 except Exception:
                     pass
 
-            if any(c['score'] >= 1.5 and len(c['plate']) >= 4 for c in scored_candidates):
+            # Fast-path early exit across crop candidates if confident plate locked
+            if any((c['score'] >= 1.8 and len(c['plate']) >= 4) or (c['score'] >= 1.5 and len(c['plate']) >= 6) for c in scored_candidates):
                 break
 
             # Limit total candidate crops evaluated to at most 4

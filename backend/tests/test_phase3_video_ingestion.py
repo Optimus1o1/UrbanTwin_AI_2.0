@@ -326,4 +326,44 @@ def test_4_digit_numeric_plate_recognition():
     assert conf >= 0.70
 
 
+def test_camera_recognized_vehicles_endpoint():
+    """
+    Validates GET /api/v1/cameras/{id}/recognized_vehicles returns rolling vehicle history
+    and POST /api/v1/cameras/{id}/recognized_vehicles/clear clears the log.
+    """
+    service = VideoIngestionService.get_instance()
+    worker = service.get_worker("CAM_01")
+    # Record sample recognized vehicle
+    worker.record_recognized_vehicle({
+        "track_id": 105,
+        "plate_text": "WB02AK4921",
+        "vehicle_type": "Sedan / Passenger Car",
+        "vehicle_color": "Pearl White",
+        "color_hex": "#f8fafc",
+        "speed_kmh": 46.5,
+        "lane": "Lane 2 (Express Center)",
+        "confidence": 0.96,
+        "status": "VERIFIED"
+    })
 
+    res = client.get("/api/v1/cameras/CAM_01/recognized_vehicles")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["camera_id"] == "CAM_01"
+    assert data["total_recognized"] >= 1
+    assert any(v["plate_text"] == "WB02AK4921" for v in data["vehicles"])
+
+    # Test aggregate 'ALL' query
+    res_all = client.get("/api/v1/cameras/ALL/recognized_vehicles")
+    assert res_all.status_code == 200
+    data_all = res_all.json()
+    assert data_all["camera_id"] == "ALL"
+    assert data_all["total_recognized"] >= 1
+
+    # Test clear endpoint
+    res_clear = client.post("/api/v1/cameras/CAM_01/recognized_vehicles/clear")
+    assert res_clear.status_code == 200
+    assert res_clear.json()["status"] == "cleared"
+
+    res_after = client.get("/api/v1/cameras/CAM_01/recognized_vehicles")
+    assert res_after.json()["total_recognized"] == 0

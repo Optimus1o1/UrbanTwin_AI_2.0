@@ -157,7 +157,7 @@ class LiveVehicleRecognitionEngine:
         self.frame_index = 0
 
         # Asynchronous OCR Worker Pool (non-blocking, maintains 30 FPS fluid stream)
-        self.ocr_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        self.ocr_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         self.pending_ocr_future: Optional[concurrent.futures.Future] = None
         self.cached_plates: Dict[int, Tuple[str, float]] = {}  # track_id -> (plate_text, conf)
         self.last_ocr_submission_time = 0.0
@@ -255,8 +255,8 @@ class LiveVehicleRecognitionEngine:
         h, w = gray.shape[:2]
         candidates: List[Dict[str, Any]] = []
 
-        # 1. Deep Learning Detection (SSDLite) - Run every 2 frames or if cache empty
-        if self.frame_index % 2 == 0 or not self.cached_detections:
+        # 1. Deep Learning Detection (SSDLite) - Run on stride 3 or if cache empty
+        if self.frame_index % 3 == 0 or not self.cached_detections:
             ssdlite_results = self.detector.detect(frame, score_threshold=0.30)
             if ssdlite_results:
                 self.cached_detections = ssdlite_results
@@ -615,7 +615,7 @@ class LiveVehicleRecognitionEngine:
             self._draw_center_reticle(frame)
 
         # 4. Dispatch next OCR inference job if worker is idle
-        if self.pending_ocr_future is None and (now - self.last_ocr_submission_time >= 0.20):
+        if self.pending_ocr_future is None and (now - self.last_ocr_submission_time >= 0.10):
             # Center reticle zone (360x180) precisely matching the user's on-screen reticle
             center_crop = frame[max(0, h // 2 - 90):min(h, h // 2 + 90), max(0, w // 2 - 180):min(w, w // 2 + 180)]
             if self.frame_index % 2 == 0 and center_crop.size > 0:
@@ -862,10 +862,69 @@ class CameraStreamWorker:
         # Browser pushed frame buffer
         self.pushed_frame: Optional[np.ndarray] = None
         self.last_pushed_time = 0.0
+
+        # Rolling thread-safe recognized vehicles history (up to 40 entries)
+        self.recognized_vehicle_history: List[Dict[str, Any]] = []
+
+        # Video file playback clock synchronization
+        self.video_fps = 25.0
+        self.video_total_frames = 0
+        self.video_start_time = 0.0
         
         self.synthetic_gen = SyntheticTrafficGenerator(camera_id=camera_id, camera_name=camera_name)
         self.recognition_engine = LiveVehicleRecognitionEngine(camera_id=camera_id)
         self.thread: Optional[threading.Thread] = None
+
+    def record_recognized_vehicle(self, det: Dict[str, Any]):
+        """Maintains rolling history of recognized vehicles with de-duplication and live update."""
+        plate = det.get("plate_text", "")
+        if not plate or plate == "SCANNING..." or len(plate) < 4:
+            return
+
+        now_str = time.strftime("%H:%M:%S")
+        conf = float(det.get("confidence", 0.94))
+        status = "VERIFIED" if conf >= 0.88 else "ANPR LOCK"
+
+        entry = {
+            "camera_id": self.camera_id,
+            "track_id": det.get("track_id", 0),
+            "plate_text": plate,
+            "vehicle_type": det.get("vehicle_type", "Vehicle"),
+            "vehicle_color": det.get("vehicle_color", "Silver Metallic"),
+            "color_hex": det.get("color_hex", "#cbd5e1"),
+            "speed_kmh": round(float(det.get("speed_kmh", 0.0)), 1),
+            "lane": det.get("lane", "Lane 2 (Express Center)"),
+            "confidence": round(conf, 3),
+            "timestamp": det.get("timestamp") or now_str,
+            "status": status
+        }
+
+        with self.lock:
+            existing_idx = None
+            for idx, item in enumerate(self.recognized_vehicle_history[:10]):
+                if item["plate_text"] == plate or (item["track_id"] == entry["track_id"] and item["track_id"] != 0):
+                    existing_idx = idx
+                    break
+
+            if existing_idx is not None:
+                self.recognized_vehicle_history[existing_idx].update({
+                    "speed_kmh": entry["speed_kmh"],
+                    "confidence": max(self.recognized_vehicle_history[existing_idx]["confidence"], entry["confidence"]),
+                    "timestamp": entry["timestamp"],
+                    "status": status
+                })
+            else:
+                self.recognized_vehicle_history.insert(0, entry)
+                if len(self.recognized_vehicle_history) > 40:
+                    self.recognized_vehicle_history.pop()
+
+    def get_recognized_vehicles(self) -> List[Dict[str, Any]]:
+        with self.lock:
+            return list(self.recognized_vehicle_history)
+
+    def clear_recognized_vehicles(self):
+        with self.lock:
+            self.recognized_vehicle_history.clear()
 
     def start(self):
         if self.is_running:
@@ -1011,7 +1070,7 @@ class CameraStreamWorker:
                     frame_bgr, detections = self.synthetic_gen.generate_frame()
                     self._draw_status_watermark(frame_bgr, f"ERROR: {str(e)[:30]}")
 
-            # 4. Video File Ingestion Mode (Sequential playback)
+            # 4. Video File Ingestion Mode (Real-Time Clock Synchronized Playback)
             elif mode == "video_file" and source:
                 try:
                     if cap is None or current_cap_url != source or isinstance(cap, BufferlessCapture):
@@ -1019,14 +1078,32 @@ class CameraStreamWorker:
                             cap.release()
                         cap = cv2.VideoCapture(source)
                         current_cap_url = source
+                        v_fps = cap.get(cv2.CAP_PROP_FPS) if cap and cap.isOpened() else 25.0
+                        self.video_fps = v_fps if (5.0 <= v_fps <= 120.0) else 25.0
+                        self.video_total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) if cap and cap.isOpened() else 0
+                        self.video_start_time = time.time()
 
                     if cap and cap.isOpened():
+                        # Synchronize video position to wall clock to guarantee natural 1.0x real-time playback
+                        v_elapsed = time.time() - self.video_start_time
+                        target_frame = int(v_elapsed * self.video_fps)
+
+                        if self.video_total_frames > 0 and target_frame >= self.video_total_frames:
+                            self.video_start_time = time.time()
+                            target_frame = 0
+                            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
+                        cur_pos = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+                        if target_frame > cur_pos + 1 and (self.video_total_frames <= 0 or target_frame < self.video_total_frames):
+                            cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
+
                         ret, raw_frame = cap.read()
                         if ret and raw_frame is not None:
                             frame_bgr, detections = self._annotate_external_frame(raw_frame)
                             self.status = "STREAMING"
                         else:
                             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                            self.video_start_time = time.time()
                             time.sleep(0.02)
                     else:
                         self.status = "SOURCE_UNREACHABLE"
@@ -1047,6 +1124,11 @@ class CameraStreamWorker:
                 self.status = "STREAMING_SYNTHETIC"
 
             if frame_bgr is not None:
+                # Continuously log all recognized vehicles into rolling history
+                if detections:
+                    for det in detections:
+                        self.record_recognized_vehicle(det)
+
                 ret, jpeg_buf = cv2.imencode(".jpg", frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 70])
                 if ret:
                     jpeg_bytes = jpeg_buf.tobytes()
@@ -1142,6 +1224,21 @@ class VideoIngestionService:
 
     def get_all_stream_statuses(self) -> List[Dict[str, Any]]:
         return [self.get_stream_status(cam_id) for cam_id in self.workers.keys()]
+
+    def get_recognized_vehicles(self, camera_id: str) -> List[Dict[str, Any]]:
+        worker = self.get_worker(camera_id)
+        return worker.get_recognized_vehicles()
+
+    def clear_recognized_vehicles(self, camera_id: str):
+        worker = self.get_worker(camera_id)
+        worker.clear_recognized_vehicles()
+
+    def get_all_recognized_vehicles(self) -> List[Dict[str, Any]]:
+        all_v = []
+        for cam_id in sorted(self.workers.keys()):
+            all_v.extend(self.workers[cam_id].get_recognized_vehicles())
+        all_v.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        return all_v
 
     def generate_mjpeg_stream(self, camera_id: str) -> Generator[bytes, None, None]:
         """

@@ -2929,13 +2929,112 @@ window.locateSnapshotPlate = function () {
   }
 };
 
+window.recognizedVehiclesFilter = 'ALL';
+window.currentRecognizedVehicles = [];
+
+window.setRecognizedVehiclesFilter = function (camId) {
+  window.recognizedVehiclesFilter = camId;
+  ['all', 'cam01', 'cam02'].forEach(id => {
+    const btn = document.getElementById(`btn-filter-cam-${id}`);
+    if (btn) {
+      if ((id === 'all' && camId === 'ALL') || (id === 'cam01' && camId === 'CAM_01') || (id === 'cam02' && camId === 'CAM_02')) {
+        btn.className = "px-2.5 py-1 rounded bg-cyan-600/40 text-cyan-300 font-bold border border-cyan-500/40 transition";
+      } else {
+        btn.className = "px-2.5 py-1 rounded text-gray-400 hover:text-white transition";
+      }
+    }
+  });
+  window.fetchCameraRecognizedVehicles(camId);
+};
+
+window.fetchCameraRecognizedVehicles = async function (camId = window.recognizedVehiclesFilter || 'ALL') {
+  try {
+    const res = await fetch(`/api/v1/cameras/${camId}/recognized_vehicles`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const vehicles = data.vehicles || [];
+    window.currentRecognizedVehicles = vehicles;
+    renderRecognizedVehiclesTable(vehicles);
+
+    // Update Live Stream Telemetry KPI Strip
+    const liveActiveCount = document.getElementById('telemetry-live-active-count');
+    const liveAvgSpeed = document.getElementById('telemetry-live-avg-speed');
+    const liveAvgConf = document.getElementById('telemetry-live-avg-conf');
+    const liveLatestPlate = document.getElementById('telemetry-live-latest-plate');
+
+    if (liveActiveCount) {
+      liveActiveCount.textContent = `${vehicles.length} Vehicle${vehicles.length === 1 ? '' : 's'}`;
+    }
+
+    if (vehicles.length > 0) {
+      const avgSpeed = (vehicles.reduce((acc, d) => acc + (d.speed_kmh || 0), 0) / vehicles.length).toFixed(1);
+      if (liveAvgSpeed) liveAvgSpeed.textContent = `${avgSpeed} km/h`;
+      const avgConf = Math.round((vehicles.reduce((acc, d) => acc + (d.confidence || 0.95), 0) / vehicles.length) * 100);
+      if (liveAvgConf) liveAvgConf.textContent = `${avgConf}%`;
+      if (liveLatestPlate) liveLatestPlate.textContent = vehicles[0].plate_text;
+    } else {
+      if (liveAvgSpeed) liveAvgSpeed.textContent = "0.0 km/h";
+      if (liveAvgConf) liveAvgConf.textContent = "96.4%";
+      if (liveLatestPlate) liveLatestPlate.textContent = "SCANNING...";
+    }
+  } catch (err) {
+    console.warn("Error fetching recognized vehicles:", err);
+  }
+};
+
+window.exportRecognizedVehiclesCSV = function () {
+  const list = window.currentRecognizedVehicles || [];
+  if (list.length === 0) {
+    if (window.showToast) window.showToast("No recognized vehicles available to export yet", "warning");
+    return;
+  }
+
+  const headers = ["Camera Node", "Timestamp", "License Plate", "Vehicle Class", "Body Color", "Speed (km/h)", "Lane", "OCR Confidence", "Verification Status"];
+  const rows = list.map(v => [
+    `"${v.camera_id || ''}"`,
+    `"${v.timestamp || ''}"`,
+    `"${v.plate_text || ''}"`,
+    `"${v.vehicle_type || ''}"`,
+    `"${v.vehicle_color || ''}"`,
+    v.speed_kmh || 0,
+    `"${v.lane || ''}"`,
+    `${Math.round((v.confidence || 0.94) * 100)}%`,
+    `"${v.status || 'VERIFIED'}"`
+  ]);
+
+  const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `UrbanTwin_Recognized_Vehicles_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "_")}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  if (window.showToast) window.showToast(`Exported ${list.length} vehicles to CSV`, "success");
+};
+
+window.clearRecognizedVehiclesLog = async function () {
+  const targetCam = window.recognizedVehiclesFilter || 'ALL';
+  try {
+    const res = await fetch(`/api/v1/cameras/${targetCam}/recognized_vehicles/clear`, { method: 'POST' });
+    if (res.ok) {
+      window.currentRecognizedVehicles = [];
+      renderRecognizedVehiclesTable([]);
+      const liveActiveCount = document.getElementById('telemetry-live-active-count');
+      if (liveActiveCount) liveActiveCount.textContent = "0 Vehicles";
+      if (window.showToast) window.showToast(`Recognized vehicles log cleared (${targetCam})`, "info");
+    }
+  } catch (err) {
+    console.error("Failed to clear log:", err);
+  }
+};
+
 window.loadStreamStatuses = async function () {
   try {
     const res = await fetch('/api/v1/cameras/streams/status');
     if (!res.ok) return;
     const statuses = await res.json();
     let totalPlates = 0;
-    const detectionsAll = [];
 
     statuses.forEach(s => {
       totalPlates += s.plates_detected || 0;
@@ -2955,87 +3054,105 @@ window.loadStreamStatuses = async function () {
         const topDet = s.latest_detections[0];
         const spdStr = (topDet.speed_kmh && topDet.speed_kmh > 0) ? `${topDet.speed_kmh.toFixed(1)} km/h` : 'STATIONARY';
         hudPlate.textContent = `LATEST: ${topDet.plate_text} • ${spdStr} (${Math.round((topDet.confidence || 0.95)*100)}%)`;
-        s.latest_detections.forEach(d => {
-          detectionsAll.push({ ...d, camera_id: s.camera_id });
-        });
       }
     });
 
     const totalPlatesEl = document.getElementById('telemetry-total-plates');
     if (totalPlatesEl) totalPlatesEl.textContent = `${totalPlates} Plates`;
 
-    // Update Live Stream Telemetry KPI Strip
-    const liveActiveCount = document.getElementById('telemetry-live-active-count');
-    const liveAvgSpeed = document.getElementById('telemetry-live-avg-speed');
-    const liveAvgConf = document.getElementById('telemetry-live-avg-conf');
-    const liveLatestPlate = document.getElementById('telemetry-live-latest-plate');
-
-    if (detectionsAll.length > 0) {
-      if (liveActiveCount) liveActiveCount.textContent = `${detectionsAll.length} Targets`;
-      const avgSpeed = (detectionsAll.reduce((acc, d) => acc + (d.speed_kmh || 0), 0) / detectionsAll.length).toFixed(1);
-      if (liveAvgSpeed) liveAvgSpeed.textContent = `${avgSpeed} km/h`;
-      const avgConf = Math.round((detectionsAll.reduce((acc, d) => acc + (d.confidence || 0.95), 0) / detectionsAll.length) * 100);
-      if (liveAvgConf) liveAvgConf.textContent = `${avgConf}%`;
-      if (liveLatestPlate) liveLatestPlate.textContent = detectionsAll[0].plate_text;
-    }
-
-    renderStreamDetectionsTable(detectionsAll);
+    // Fetch the live recognized vehicles log
+    await window.fetchCameraRecognizedVehicles();
   } catch (err) {
     console.warn("Error updating stream telemetry:", err);
   }
 };
 
-function renderStreamDetectionsTable(detections) {
+function getVehicleIcon(vType) {
+  const t = (vType || '').toLowerCase();
+  if (t.includes('bus')) return '<i class="fa-solid fa-bus text-amber-400 mr-1.5"></i>';
+  if (t.includes('truck')) return '<i class="fa-solid fa-truck text-purple-400 mr-1.5"></i>';
+  if (t.includes('motorcycle') || t.includes('two-wheeler') || t.includes('bike')) return '<i class="fa-solid fa-motorcycle text-emerald-400 mr-1.5"></i>';
+  if (t.includes('taxi')) return '<i class="fa-solid fa-taxi text-yellow-400 mr-1.5"></i>';
+  if (t.includes('suv')) return '<i class="fa-solid fa-car-side text-blue-400 mr-1.5"></i>';
+  return '<i class="fa-solid fa-car text-cyan-400 mr-1.5"></i>';
+}
+
+function renderRecognizedVehiclesTable(vehicles) {
   const tbody = document.getElementById('stream-detections-table-body');
   if (!tbody) return;
 
-  if (!detections || detections.length === 0) {
-    if (!tbody.hasChildNodes()) {
-      tbody.innerHTML = `<tr><td colspan="9" class="py-4 text-center text-gray-500 font-mono">Awaiting live vehicle frame detections...</td></tr>`;
-    }
+  if (!vehicles || vehicles.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10" class="py-6 text-center text-gray-500 font-mono"><div class="flex flex-col items-center justify-center space-y-1"><i class="fa-solid fa-video text-cyan-500/40 text-lg mb-1 animate-pulse"></i><span>Awaiting live vehicle recognition &amp; ANPR lock...</span><span class="text-[10px] text-gray-600">Position vehicle or license plate in camera reticle</span></div></td></tr>`;
     return;
   }
 
   const now = new Date();
   const timeStr = now.toTimeString().split(' ')[0];
 
-  const rowsHtml = detections.slice(0, 10).map(d => {
+  const rowsHtml = vehicles.slice(0, 25).map(d => {
     const speedVal = d.speed_kmh || 0.0;
-    const speedColor = speedVal > 55 ? 'text-rose-400 font-bold' : (speedVal > 25 ? 'text-emerald-400 font-semibold' : (speedVal > 0 ? 'text-cyan-400 font-semibold' : 'text-amber-400 font-normal'));
+    const speedColor = speedVal > 55 ? 'text-rose-400 font-bold bg-rose-950/40 border-rose-500/30' : (speedVal > 25 ? 'text-emerald-400 font-semibold bg-emerald-950/40 border-emerald-500/30' : (speedVal > 0 ? 'text-cyan-400 font-semibold bg-cyan-950/40 border-cyan-500/30' : 'text-amber-400 font-normal bg-amber-950/30 border-amber-500/30'));
     const speedLabel = speedVal > 0 ? `${speedVal.toFixed(1)} km/h` : '0.0 km/h (Stationary)';
     const colorHex = d.color_hex || '#cbd5e1';
     const colorName = d.vehicle_color || 'Silver Metallic';
     const laneStr = d.lane || 'Lane 2 (Express Center)';
+    const vType = d.vehicle_type || 'Sedan / Passenger Car';
+    const vIcon = getVehicleIcon(vType);
+    const confVal = Math.round((d.confidence || 0.94) * 100);
+    const isVerified = (d.status === 'VERIFIED') || confVal >= 88;
 
     return `
-    <tr class="hover:bg-cyan-950/20 transition">
-      <td class="py-2.5 px-3 font-bold text-cyan-400 flex items-center space-x-1.5">
-        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-        <span>${d.camera_id}</span>
+    <tr class="hover:bg-cyan-950/25 transition border-b border-slate-800/60">
+      <td class="py-2.5 px-3 font-bold text-cyan-400 flex items-center space-x-1.5 whitespace-nowrap">
+        <span class="w-1.5 h-1.5 rounded-full ${d.camera_id === 'CAM_01' ? 'bg-cyan-400' : 'bg-purple-400'}"></span>
+        <span>${d.camera_id || 'CAM_01'}</span>
       </td>
-      <td class="py-2.5 px-3 text-gray-400">${d.timestamp || timeStr}</td>
-      <td class="py-2.5 px-3 font-bold text-white tracking-wider">
-        <span class="bg-slate-900 px-2 py-0.5 rounded border border-cyan-500/40 text-cyan-300 font-mono font-bold">${d.plate_text}</span>
+      <td class="py-2.5 px-3 text-gray-400 whitespace-nowrap">${d.timestamp || timeStr}</td>
+      <td class="py-2.5 px-3 whitespace-nowrap">
+        <div class="inline-flex items-center bg-slate-900 border border-slate-700/80 rounded overflow-hidden shadow-sm font-mono select-all">
+          <div class="bg-blue-600 px-1 py-0.5 text-[8px] font-bold text-white flex flex-col items-center leading-none justify-center">
+            <span>IND</span>
+          </div>
+          <div class="px-2 py-0.5 text-white font-bold tracking-wider text-xs bg-slate-950/90 font-mono">
+            ${d.plate_text}
+          </div>
+        </div>
       </td>
-      <td class="py-2.5 px-3 text-slate-300 font-sans font-semibold">${d.vehicle_type || 'Vehicle'}</td>
-      <td class="py-2.5 px-3">
+      <td class="py-2.5 px-3 text-slate-300 font-sans font-semibold whitespace-nowrap">
+        <div class="flex items-center">
+          ${vIcon}
+          <span>${vType}</span>
+        </div>
+      </td>
+      <td class="py-2.5 px-3 whitespace-nowrap">
         <div class="flex items-center space-x-1.5">
           <span class="w-2.5 h-2.5 rounded-full border border-slate-700 shadow-sm shrink-0" style="background-color: ${colorHex}"></span>
           <span class="text-slate-300 text-[11px] truncate max-w-[120px]">${colorName}</span>
         </div>
       </td>
-      <td class="py-2.5 px-3 font-mono ${speedColor}">${speedLabel}</td>
-      <td class="py-2.5 px-3">
+      <td class="py-2.5 px-3 whitespace-nowrap">
+        <span class="px-2 py-0.5 rounded border text-[11px] font-mono ${speedColor}">${speedLabel}</span>
+      </td>
+      <td class="py-2.5 px-3 whitespace-nowrap">
         <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-cyan-300 text-[10px] whitespace-nowrap">${laneStr}</span>
       </td>
-      <td class="py-2.5 px-3">
-        <span class="px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold font-mono">
-          ${Math.round((d.confidence || 0.94) * 100)}% Match
+      <td class="py-2.5 px-3 whitespace-nowrap">
+        <div class="flex items-center space-x-2">
+          <div class="w-12 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+            <div class="bg-gradient-to-r from-teal-400 to-emerald-400 h-1.5 rounded-full" style="width: ${confVal}%"></div>
+          </div>
+          <span class="text-emerald-400 font-bold text-[11px] font-mono">${confVal}%</span>
+        </div>
+      </td>
+      <td class="py-2.5 px-3 whitespace-nowrap">
+        <span class="px-2 py-0.5 rounded ${isVerified ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40' : 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/40'} text-[10px] font-bold font-mono">
+          <i class="fa-solid ${isVerified ? 'fa-circle-check text-emerald-400' : 'fa-crosshairs text-cyan-400'} mr-1"></i>
+          ${d.status || (isVerified ? 'VERIFIED' : 'ANPR LOCK')}
         </span>
       </td>
-      <td class="py-2.5 px-3 text-right">
-        <button onclick="window.switchTab('tracking'); if(window.queryPlate) window.queryPlate('${d.plate_text}');" class="px-2.5 py-1 bg-cyan-600/30 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 rounded transition text-[10px] font-bold whitespace-nowrap">
-          <i class="fa-solid fa-crosshairs mr-1"></i>Locate Route
+      <td class="py-2.5 px-3 text-right whitespace-nowrap">
+        <button onclick="window.switchTab('tracking'); if(window.queryPlate) window.queryPlate('${d.plate_text}');" class="px-2.5 py-1 bg-cyan-600/30 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 rounded transition text-[10px] font-bold whitespace-nowrap shadow-sm">
+          <i class="fa-solid fa-crosshairs mr-1"></i>Track Route
         </button>
       </td>
     </tr>
@@ -3044,7 +3161,7 @@ function renderStreamDetectionsTable(detections) {
   tbody.innerHTML = rowsHtml;
 }
 
-// Auto-poll stream status every 1.5 seconds whenever streams are active or tab is opened
+// Auto-poll stream status and recognized vehicles every 800ms whenever streams tab is opened
 if (!streamPollingTimer) {
   streamPollingTimer = setInterval(() => {
     const streamsTab = document.getElementById('tab-streams');
@@ -3052,11 +3169,11 @@ if (!streamPollingTimer) {
     if (isVisible || (typeof currentTab !== 'undefined' && currentTab === 'streams')) {
       window.loadStreamStatuses();
     }
-  }, 1500);
+  }, 800);
 }
 
 // Initial status load
 setTimeout(() => {
   if (window.loadStreamStatuses) window.loadStreamStatuses();
-}, 600);
+}, 400);
 

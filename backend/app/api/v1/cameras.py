@@ -213,3 +213,44 @@ def upload_stream_video(request: Request, camera_id: str, file: UploadFile = Fil
     return service.configure_camera_stream(camera_id, mode="video_file", source_url=file_path)
 
 
+@router.get("/{camera_id}/recognized_vehicles", response_model=Dict[str, Any])
+@limiter.limit("120/minute")
+def get_camera_recognized_vehicles(request: Request, camera_id: str):
+    """
+    Returns the real-time rolling log of recognized vehicles and license plates
+    identified by the camera's ANPR engine. Supports 'ALL' to aggregate across all cameras.
+    """
+    service = VideoIngestionService.get_instance()
+    if camera_id.upper() == "ALL":
+        vehicles = service.get_all_recognized_vehicles()
+        return {
+            "camera_id": "ALL",
+            "total_recognized": len(vehicles),
+            "vehicles": vehicles
+        }
+
+    vehicles = service.get_recognized_vehicles(camera_id)
+    return {
+        "camera_id": camera_id,
+        "total_recognized": len(vehicles),
+        "vehicles": vehicles
+    }
+
+
+@router.post("/{camera_id}/recognized_vehicles/clear", response_model=Dict[str, Any])
+@limiter.limit("30/minute")
+def clear_camera_recognized_vehicles(request: Request, camera_id: str):
+    """
+    Clears the recognized vehicles telemetry history buffer for the specified camera (or 'ALL').
+    """
+    service = VideoIngestionService.get_instance()
+    if camera_id.upper() == "ALL":
+        for cam_id in list(service.workers.keys()):
+            service.clear_recognized_vehicles(cam_id)
+        return {"camera_id": "ALL", "status": "cleared", "total_recognized": 0}
+
+    service.clear_recognized_vehicles(camera_id)
+    return {"camera_id": camera_id, "status": "cleared", "total_recognized": 0}
+
+
+
