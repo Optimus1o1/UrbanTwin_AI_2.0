@@ -203,6 +203,7 @@ async def custom_redoc_html():
 
 # Root route (Landing Page)
 @app.get("/", include_in_schema=False)
+@app.get("/index.html", include_in_schema=False)
 def root():
     if INDEX_HTML.exists():
         return FileResponse(str(INDEX_HTML))
@@ -242,6 +243,7 @@ if STATIC_DIR.exists():
         app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")
 
     @app.get("/dashboard", include_in_schema=False)
+    @app.get("/dashboard.html", include_in_schema=False)
     @app.get("/ui", include_in_schema=False)
     @app.get("/app", include_in_schema=False)
     def get_dashboard():
@@ -250,6 +252,7 @@ if STATIC_DIR.exists():
         return FileResponse(str(INDEX_HTML))
 
     @app.get("/proposal", include_in_schema=False)
+    @app.get("/proposal.html", include_in_schema=False)
     @app.get("/blueprint", include_in_schema=False)
     def get_proposal():
         if PROPOSAL_HTML.exists():
