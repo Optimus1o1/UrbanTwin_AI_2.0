@@ -400,12 +400,16 @@ def localize_plate_candidates(img_rgb: np.ndarray) -> List[Tuple[np.ndarray, Tup
     candidates: List[Tuple[np.ndarray, Tuple[int, int, int, int], str]] = []
 
     aspect_ratio = w / float(max(1, h))
-    is_pre_cropped = (1.4 <= aspect_ratio <= 7.5) and (h <= 240) and (w <= 640)
+    # Truly pre-cropped tight plate (typically <= 90px tall and aspect ratio >= 1.8, e.g. 70x240, 50x180)
+    is_tight_plate_crop = (1.8 <= aspect_ratio <= 7.0) and (h <= 90) and (w <= 500)
 
     # Fast-Path: If input image is already an isolated plate crop (e.g. 70x240, 50x180), evaluate directly
-    if is_pre_cropped:
+    if is_tight_plate_crop:
         candidates.append((img_rgb, (0, 0, w, h), 'direct_plate_crop'))
         return candidates
+
+    # For general viewfinders or vehicle images, include the full crop as baseline
+    candidates.append((img_rgb, (0, 0, w, h), 'input_frame'))
 
     gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
     contour_candidates: List[Tuple[float, Tuple[np.ndarray, Tuple[int, int, int, int], str]]] = []
@@ -491,7 +495,8 @@ def localize_plate_candidates(img_rgb: np.ndarray) -> List[Tuple[np.ndarray, Tup
             candidates.append((center_crop, (cx1, cy1, cx2 - cx1, cy2 - cy1), 'center_viewfinder'))
 
     # 5. Last Resort Full Image Fallback
-    candidates.append((img_rgb, (0, 0, w, h), 'full_image_fallback'))
+    if not any(c[2] in ('direct_plate_crop', 'input_frame') for c in candidates):
+        candidates.append((img_rgb, (0, 0, w, h), 'full_image_fallback'))
 
     return candidates
 

@@ -2854,8 +2854,11 @@ window.connectPhoneFeed = async function (camId) {
     refreshStreamImage(camId);
     if (window.playAudioCue) window.playAudioCue('action');
 
-    // Poll after 2 seconds to check if phone is actively streaming frames
-    setTimeout(async () => {
+    // Active periodic polling to verify phone stream connectivity
+    let attempts = 0;
+    const maxAttempts = 8;
+    const checkStreamInterval = setInterval(async () => {
+      attempts++;
       try {
         const checkRes = await fetch('/api/v1/cameras/streams/status');
         if (checkRes.ok) {
@@ -2863,14 +2866,27 @@ window.connectPhoneFeed = async function (camId) {
           const cur = statuses.find(s => s.camera_id === camId);
           if (cur && statusEl) {
             if (cur.status === 'STREAMING') {
+              clearInterval(checkStreamInterval);
               statusEl.innerHTML = `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-satellite-dish mr-1"></i>LIVE STREAMING! FPS: ${cur.fps} • ${cur.frames_processed} frames</span>`;
+              if (modeLabel) modeLabel.textContent = `Active: Phone IP (STREAMING)`;
+              refreshStreamImage(camId);
+              return;
             } else if (cur.status === 'SOURCE_UNREACHABLE') {
+              clearInterval(checkStreamInterval);
               statusEl.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Phone unreachable at ${url}. Check IP Webcam server is running & on same Wi-Fi!</span>`;
+              if (modeLabel) modeLabel.textContent = `Phone Unreachable (${url})`;
+              return;
+            } else if (cur.status === 'CONNECTING') {
+              statusEl.innerHTML = `<span class="text-amber-400"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i>Connecting to phone (${attempts}/${maxAttempts})... Handshake in progress</span>`;
             }
           }
         }
       } catch (_) {}
-    }, 2000);
+
+      if (attempts >= maxAttempts) {
+        clearInterval(checkStreamInterval);
+      }
+    }, 1200);
 
   } catch (err) {
     if (statusEl) {

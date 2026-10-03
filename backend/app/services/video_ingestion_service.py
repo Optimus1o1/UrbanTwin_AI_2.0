@@ -32,190 +32,6 @@ STREAMS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."
 os.makedirs(STREAMS_DIR, exist_ok=True)
 
 
-class UniversalStreamCapture:
-    """
-    High-performance zero-buffer stream capture for IP cameras and smartphone webcams.
-    Natively supports:
-    1. Direct HTTP multipart MJPEG stream decoding (IP Webcam, DroidCam, etc.)
-    2. Automatic fallback to snapshot polling (/shot.jpg, /photo.jpg) at 20-25 FPS
-    3. OpenCV VideoCapture fallback for RTSP or legacy streams
-    4. Auto-downscales high-res mobile sensors (e.g. 1080p/4K) to 1280x720 to prevent CPU/memory lag.
-    """
-
-    def __init__(self, url: str):
-        self.raw_url = url.strip()
-        self.url = self._normalize_url(self.raw_url)
-        self.latest_frame: Optional[np.ndarray] = None
-        self.lock = threading.Lock()
-        self.is_running = True
-        self.connected = False
-        self.last_frame_time = 0.0
-        self.thread = threading.Thread(target=self._capture_worker, daemon=True)
-        self.thread.start()
-
-    def _normalize_url(self, u: str) -> str:
-        if not u.startswith(("http://", "https://", "rtsp://")):
-            u = "http://" + u
-        return u
-
-    def _capture_worker(self):
-        if self.url.startswith(("http://", "https://")):
-            success = self._run_http_mjpeg_loop()
-            if not success and self.is_running:
-                self._run_cv_loop()
-        else:
-            self._run_cv_loop()
-
-    def _run_http_mjpeg_loop(self) -> bool:
-        """Reads multipart JPEG bytes directly from HTTP connection with zero OS buffer lag."""
-        try:
-            req = urllib.request.Request(
-                self.url,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) UrbanTwin/2.0"}
-            )
-            resp = urllib.request.urlopen(req, timeout=3.5)
-            content_type = resp.headers.get("Content-Type", "")
-
-            if "image/jpeg" in content_type and "multipart" not in content_type:
-                return self._run_snapshot_poll_loop()
-
-            byte_buffer = b""
-            while self.is_running:
-                chunk = resp.read(8192)
-                if not chunk:
-                    break
-                byte_buffer += chunk
-
-                start_idx = byte_buffer.find(b"\xff\xd8")
-                end_idx = byte_buffer.find(b"\xff\xd9")
-
-                if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-                    jpg_data = byte_buffer[start_idx : end_idx + 2]
-                    byte_buffer = byte_buffer[end_idx + 2 :]
-
-                    try:
-                        nparr = np.frombuffer(jpg_data, np.uint8)
-                        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                        if frame is not None and frame.size > 0:
-                            h, w = frame.shape[:2]
-                            if w > 1280 or h > 720:
-                                frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
-                            with self.lock:
-                                self.latest_frame = frame
-                                self.connected = True
-                                self.last_frame_time = time.time()
-                    except Exception:
-                        pass
-            return self.connected
-        except Exception:
-            if self.is_running:
-                return self._run_snapshot_poll_loop()
-            return False
-
-    def _run_snapshot_poll_loop(self) -> bool:
-        """Polls single-frame snapshot endpoints (/shot.jpg, /photo.jpg) at 20 FPS."""
-        base = self.url
-        for suffix in ["/video", "/videofeed", ".mjpg", "/mjpeg"]:
-            if base.endswith(suffix):
-                base = base[:-len(suffix)]
-                break
-
-        snapshot_urls = [
-            f"{base.rstrip('/')}/shot.jpg",
-            f"{base.rstrip('/')}/photo.jpg",
-            self.url
-        ]
-
-        active_snap_url = None
-        for test_url in snapshot_urls:
-            try:
-                req = urllib.request.Request(test_url, headers={"User-Agent": "UrbanTwin/2.0"})
-                res = urllib.request.urlopen(req, timeout=2.0)
-                if res.status == 200:
-                    active_snap_url = test_url
-                    break
-            except Exception:
-                continue
-
-        if not active_snap_url:
-            return False
-
-        while self.is_running:
-            poll_start = time.time()
-            try:
-                req = urllib.request.Request(active_snap_url, headers={"User-Agent": "UrbanTwin/2.0"})
-                res = urllib.request.urlopen(req, timeout=1.8)
-                raw_bytes = res.read()
-                if raw_bytes:
-                    nparr = np.frombuffer(raw_bytes, np.uint8)
-                    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                    if frame is not None and frame.size > 0:
-                        h, w = frame.shape[:2]
-                        if w > 1280 or h > 720:
-                            frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
-                        with self.lock:
-                            self.latest_frame = frame
-                            self.connected = True
-                            self.last_frame_time = time.time()
-            except Exception:
-                pass
-            elapsed = time.time() - poll_start
-            sleep_needed = max(0.01, 0.05 - elapsed)
-            time.sleep(sleep_needed)
-        return True
-
-    def _run_cv_loop(self):
-        """Standard OpenCV VideoCapture loop in dedicated thread for RTSP and generic streams."""
-        cap = None
-        try:
-            cap = cv2.VideoCapture(self.url)
-            if not cap.isOpened():
-                self.connected = False
-                return
-
-            self.connected = True
-            while self.is_running and cap.isOpened():
-                ret, frame = cap.read()
-                if not ret or frame is None:
-                    time.sleep(0.02)
-                    continue
-
-                h, w = frame.shape[:2]
-                if w > 1280 or h > 720:
-                    frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
-
-                with self.lock:
-                    self.latest_frame = frame
-                    self.last_frame_time = time.time()
-                time.sleep(0.015)
-        except Exception:
-            self.connected = False
-        finally:
-            if cap:
-                cap.release()
-
-    def isOpened(self) -> bool:
-        if not self.is_running:
-            return False
-        return self.connected and (time.time() - self.last_frame_time < 4.0)
-
-    def read(self) -> Tuple[bool, Optional[np.ndarray]]:
-        with self.lock:
-            if self.latest_frame is not None:
-                return True, self.latest_frame.copy()
-            return False, None
-
-    def release(self):
-        self.is_running = False
-        if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=1.0)
-
-
-# Backward compatibility alias
-BufferlessCapture = UniversalStreamCapture
-
-
-
 def _ocr_worker_task(crop_bgr: np.ndarray, track_id: int) -> Tuple[int, str, float]:
     """Background thread worker task executing high-accuracy ANPR OCR on vehicle/plate crop."""
     try:
@@ -648,6 +464,9 @@ class LiveVehicleRecognitionEngine:
             frame = cv2.resize(frame, (960, 540), interpolation=cv2.INTER_LINEAR)
             h, w = 540, 960
 
+        # Pristine clean frame copy for high-accuracy OCR character extraction (NO visual overlays/HUD/reticle)
+        clean_frame = frame.copy()
+
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         # 1. Harvest any completed async OCR results
@@ -682,7 +501,7 @@ class LiveVehicleRecognitionEngine:
         for cand in candidates:
             bx, by, bw, bh = cand["box"]
             cx, cy = bx + bw // 2, by + bh // 2
-            crop = frame[by:by + bh, bx:bx + bw]
+            crop = clean_frame[by:by + bh, bx:bx + bw]
 
             # Match with previous tracks or spawn new track
             matched_id = None
@@ -760,14 +579,10 @@ class LiveVehicleRecognitionEngine:
                 frame, x1, y1, x2, y2, matched_id, v_type, plate, speed, color_name, conf, ocr_locked=ocr_locked
             )
 
-        # Draw Center Reticle for steady plate & vehicle aiming in live camera modes
-        if mode in ["webcam", "browser_stream", "phone_live"]:
-            self._draw_center_reticle(frame)
-
         # 4. Dispatch next OCR inference job if worker is idle
         if self.pending_ocr_future is None and (now - self.last_ocr_submission_time >= 0.10):
             # Center reticle zone (360x180) precisely matching the user's on-screen reticle
-            center_crop = frame[max(0, h // 2 - 90):min(h, h // 2 + 90), max(0, w // 2 - 180):min(w, w // 2 + 180)]
+            center_crop = clean_frame[max(0, h // 2 - 90):min(h, h // 2 + 90), max(0, w // 2 - 180):min(w, w // 2 + 180)]
             if self.frame_index % 2 == 0 and center_crop.size > 0:
                 self.pending_ocr_future = self.ocr_executor.submit(_ocr_worker_task, center_crop.copy(), 999)
                 self.last_ocr_submission_time = now
@@ -1128,6 +943,9 @@ class CameraStreamWorker:
         self.video_fps = 25.0
         self.video_total_frames = 0
         self.video_start_time = 0.0
+
+        # Timestamp of last configure() call — used for connection grace period
+        self.last_configure_time = 0.0
         
         self.synthetic_gen = SyntheticTrafficGenerator(camera_id=camera_id, camera_name=camera_name)
         self.recognition_engine = LiveVehicleRecognitionEngine(camera_id=camera_id)
@@ -1228,6 +1046,7 @@ class CameraStreamWorker:
             self.source_url = source_url
             self.status = "CONNECTING"
             self.error_message = ""
+            self.last_configure_time = time.time()
             print(f"[VideoIngestionService] Camera {self.camera_id} reconfigured to mode '{self.mode}' (source: {self.source_url or 'Default'})")
 
     def ingest_frame(self, frame_bytes: bytes) -> bool:
@@ -1337,10 +1156,19 @@ class CameraStreamWorker:
                             self.status = "WAITING_FRAME"
                             time.sleep(0.02)
                     else:
-                        self.status = "SOURCE_UNREACHABLE"
-                        self.error_message = f"Cannot open stream: {source}"
-                        frame_bgr, detections = self.synthetic_gen.generate_frame()
-                        self._draw_status_watermark(frame_bgr, f"FALLBACK DEMO (Phone Unreachable: {source})")
+                        # Grace period: allow up to 10 seconds for phone HTTP stream to connect
+                        # before declaring the source unreachable (WiFi handshake + MJPEG negotiate)
+                        seconds_since_configure = time.time() - self.last_configure_time
+                        if seconds_since_configure < 10.0:
+                            self.status = "CONNECTING"
+                            self.error_message = ""
+                            frame_bgr, detections = self.synthetic_gen.generate_frame()
+                            self._draw_status_watermark(frame_bgr, f"CONNECTING TO PHONE ({source}) ...")
+                        else:
+                            self.status = "SOURCE_UNREACHABLE"
+                            self.error_message = f"Cannot open stream: {source}"
+                            frame_bgr, detections = self.synthetic_gen.generate_frame()
+                            self._draw_status_watermark(frame_bgr, f"PHONE UNREACHABLE: {source}")
                 except Exception as e:
                     self.status = "ERROR"
                     self.error_message = str(e)
