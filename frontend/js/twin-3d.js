@@ -36,6 +36,8 @@
   let cameraTarget = new THREE.Vector3(0, 0, 0);
   let cameraPosTarget = new THREE.Vector3(0, 36, 52);
   let clock = new THREE.Clock();
+  const FORWARD_AXIS = new THREE.Vector3(0, 0, 1);
+  const CHASE_TARGET_VEC = new THREE.Vector3();
 
   // Mouse drag Orbit / Pan state
   let isDragging = false;
@@ -115,7 +117,7 @@
       powerPreference: "high-performance"
     });
     renderer.setSize(container.clientWidth, container.clientHeight || 520);
-    const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.0 : 1.1);
+    const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.0 : 1.05);
     renderer.setPixelRatio(dpr);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.35;
@@ -1791,7 +1793,8 @@
       camera.lookAt(cameraTarget);
     } else if (cameraMode === 'chase' && targetVehicle) {
       const vPos = targetVehicle.group.position;
-      camera.position.lerp(new THREE.Vector3(vPos.x - 8, vPos.y + 6, vPos.z - 8), 0.08);
+      CHASE_TARGET_VEC.set(vPos.x - 8, vPos.y + 6, vPos.z - 8);
+      camera.position.lerp(CHASE_TARGET_VEC, 0.08);
       camera.lookAt(vPos.x, vPos.y + 1, vPos.z);
     }
 
@@ -1822,7 +1825,7 @@
 
       // Orientation along curve
       const tangent = v.curve.getTangentAt(v.progress);
-      v.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+      v.group.quaternion.setFromUnitVectors(FORWARD_AXIS, tangent);
     });
 
     // 5. Render Scene

@@ -2649,6 +2649,7 @@ window.setCameraStreamMode = async function (camId, mode) {
     if (btnUpload) btnUpload.className = "p-2 rounded-lg bg-purple-600/30 border border-purple-500/40 text-white transition flex items-center justify-center space-x-1";
     if (panelUpload) panelUpload.classList.remove('hidden');
     if (modeLabel) modeLabel.textContent = "Mode: Video File (.mp4)";
+    window.loadSampleVideo(camId, camId === 'CAM_01' ? 'CAM_01_2.mov.mp4' : 'CAM_02_2.mov.mp4');
   }
 };
 
@@ -2881,6 +2882,24 @@ window.connectPhoneFeed = async function (camId) {
       btnConnect.disabled = false;
       btnConnect.innerHTML = `<i class="fa-solid fa-link mr-1"></i>Connect`;
     }
+  }
+};
+
+window.loadSampleVideo = async function (camId, sampleName) {
+  const modeLabel = document.getElementById(`current-mode-${camId.toLowerCase()}`);
+  if (modeLabel) modeLabel.textContent = `Loading ${sampleName}...`;
+  try {
+    const res = await fetch(`/api/v1/cameras/${camId}/stream/configure`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'video_file', source_url: sampleName })
+    });
+    const data = await res.json();
+    if (modeLabel) modeLabel.textContent = `Active: MP4 Video (${sampleName})`;
+    refreshStreamImage(camId);
+    if (window.playAudioCue) window.playAudioCue('action');
+  } catch (err) {
+    console.error(`Failed to load sample video: ${err.message}`);
   }
 };
 
@@ -3120,14 +3139,26 @@ function getVehicleIcon(vType) {
   return '<i class="fa-solid fa-car text-cyan-400 mr-1.5"></i>';
 }
 
+let lastRenderedVehiclesFingerprint = "";
+
 function renderRecognizedVehiclesTable(vehicles) {
   const tbody = document.getElementById('stream-detections-table-body');
   if (!tbody) return;
 
   if (!vehicles || vehicles.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" class="py-6 text-center text-gray-500 font-mono"><div class="flex flex-col items-center justify-center space-y-1"><i class="fa-solid fa-video text-cyan-500/40 text-lg mb-1 animate-pulse"></i><span>Awaiting live vehicle recognition &amp; ANPR lock...</span><span class="text-[10px] text-gray-600">Position vehicle or license plate in camera reticle</span></div></td></tr>`;
+    if (lastRenderedVehiclesFingerprint !== "EMPTY") {
+      lastRenderedVehiclesFingerprint = "EMPTY";
+      tbody.innerHTML = `<tr><td colspan="10" class="py-6 text-center text-gray-500 font-mono"><div class="flex flex-col items-center justify-center space-y-1"><i class="fa-solid fa-video text-cyan-500/40 text-lg mb-1 animate-pulse"></i><span>Awaiting live vehicle recognition &amp; ANPR lock...</span><span class="text-[10px] text-gray-600">Position vehicle or license plate in camera reticle</span></div></td></tr>`;
+    }
     return;
   }
+
+  // Fast change-detection fingerprint to avoid 250+ DOM node rebuilds when data hasn't changed
+  const currentFingerprint = vehicles.slice(0, 10).map(v => `${v.plate_text}_${v.speed_kmh}_${v.status}`).join('|');
+  if (currentFingerprint === lastRenderedVehiclesFingerprint) {
+    return; // Unchanged data: skip expensive DOM re-render
+  }
+  lastRenderedVehiclesFingerprint = currentFingerprint;
 
   const now = new Date();
   const timeStr = now.toTimeString().split(' ')[0];
@@ -3204,15 +3235,16 @@ function renderRecognizedVehiclesTable(vehicles) {
   tbody.innerHTML = rowsHtml;
 }
 
-// Auto-poll stream status and recognized vehicles every 800ms whenever streams tab is opened
+// Auto-poll stream status and recognized vehicles every 2500ms whenever streams tab is opened and document is visible
 if (!streamPollingTimer) {
   streamPollingTimer = setInterval(() => {
+    if (document.hidden) return;
     const streamsTab = document.getElementById('tab-streams');
     const isVisible = streamsTab && !streamsTab.classList.contains('hidden');
     if (isVisible || (typeof currentTab !== 'undefined' && currentTab === 'streams')) {
       window.loadStreamStatuses();
     }
-  }, 800);
+  }, 2500);
 }
 
 // Initial status load

@@ -18,6 +18,8 @@ import random
 import threading
 import cv2
 import numpy as np
+import urllib.request
+import re
 import concurrent.futures
 from typing import Dict, Any, Optional, Generator, List, Tuple
 
@@ -28,6 +30,190 @@ from app.services.ocr_image_service import recognize_plate_from_array
 # Directory for storing uploaded stream video files
 STREAMS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "streams"))
 os.makedirs(STREAMS_DIR, exist_ok=True)
+
+
+class UniversalStreamCapture:
+    """
+    High-performance zero-buffer stream capture for IP cameras and smartphone webcams.
+    Natively supports:
+    1. Direct HTTP multipart MJPEG stream decoding (IP Webcam, DroidCam, etc.)
+    2. Automatic fallback to snapshot polling (/shot.jpg, /photo.jpg) at 20-25 FPS
+    3. OpenCV VideoCapture fallback for RTSP or legacy streams
+    4. Auto-downscales high-res mobile sensors (e.g. 1080p/4K) to 1280x720 to prevent CPU/memory lag.
+    """
+
+    def __init__(self, url: str):
+        self.raw_url = url.strip()
+        self.url = self._normalize_url(self.raw_url)
+        self.latest_frame: Optional[np.ndarray] = None
+        self.lock = threading.Lock()
+        self.is_running = True
+        self.connected = False
+        self.last_frame_time = 0.0
+        self.thread = threading.Thread(target=self._capture_worker, daemon=True)
+        self.thread.start()
+
+    def _normalize_url(self, u: str) -> str:
+        if not u.startswith(("http://", "https://", "rtsp://")):
+            u = "http://" + u
+        return u
+
+    def _capture_worker(self):
+        if self.url.startswith(("http://", "https://")):
+            success = self._run_http_mjpeg_loop()
+            if not success and self.is_running:
+                self._run_cv_loop()
+        else:
+            self._run_cv_loop()
+
+    def _run_http_mjpeg_loop(self) -> bool:
+        """Reads multipart JPEG bytes directly from HTTP connection with zero OS buffer lag."""
+        try:
+            req = urllib.request.Request(
+                self.url,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) UrbanTwin/2.0"}
+            )
+            resp = urllib.request.urlopen(req, timeout=3.5)
+            content_type = resp.headers.get("Content-Type", "")
+
+            if "image/jpeg" in content_type and "multipart" not in content_type:
+                return self._run_snapshot_poll_loop()
+
+            byte_buffer = b""
+            while self.is_running:
+                chunk = resp.read(8192)
+                if not chunk:
+                    break
+                byte_buffer += chunk
+
+                start_idx = byte_buffer.find(b"\xff\xd8")
+                end_idx = byte_buffer.find(b"\xff\xd9")
+
+                if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                    jpg_data = byte_buffer[start_idx : end_idx + 2]
+                    byte_buffer = byte_buffer[end_idx + 2 :]
+
+                    try:
+                        nparr = np.frombuffer(jpg_data, np.uint8)
+                        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                        if frame is not None and frame.size > 0:
+                            h, w = frame.shape[:2]
+                            if w > 1280 or h > 720:
+                                frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
+                            with self.lock:
+                                self.latest_frame = frame
+                                self.connected = True
+                                self.last_frame_time = time.time()
+                    except Exception:
+                        pass
+            return self.connected
+        except Exception:
+            if self.is_running:
+                return self._run_snapshot_poll_loop()
+            return False
+
+    def _run_snapshot_poll_loop(self) -> bool:
+        """Polls single-frame snapshot endpoints (/shot.jpg, /photo.jpg) at 20 FPS."""
+        base = self.url
+        for suffix in ["/video", "/videofeed", ".mjpg", "/mjpeg"]:
+            if base.endswith(suffix):
+                base = base[:-len(suffix)]
+                break
+
+        snapshot_urls = [
+            f"{base.rstrip('/')}/shot.jpg",
+            f"{base.rstrip('/')}/photo.jpg",
+            self.url
+        ]
+
+        active_snap_url = None
+        for test_url in snapshot_urls:
+            try:
+                req = urllib.request.Request(test_url, headers={"User-Agent": "UrbanTwin/2.0"})
+                res = urllib.request.urlopen(req, timeout=2.0)
+                if res.status == 200:
+                    active_snap_url = test_url
+                    break
+            except Exception:
+                continue
+
+        if not active_snap_url:
+            return False
+
+        while self.is_running:
+            poll_start = time.time()
+            try:
+                req = urllib.request.Request(active_snap_url, headers={"User-Agent": "UrbanTwin/2.0"})
+                res = urllib.request.urlopen(req, timeout=1.8)
+                raw_bytes = res.read()
+                if raw_bytes:
+                    nparr = np.frombuffer(raw_bytes, np.uint8)
+                    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                    if frame is not None and frame.size > 0:
+                        h, w = frame.shape[:2]
+                        if w > 1280 or h > 720:
+                            frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
+                        with self.lock:
+                            self.latest_frame = frame
+                            self.connected = True
+                            self.last_frame_time = time.time()
+            except Exception:
+                pass
+            elapsed = time.time() - poll_start
+            sleep_needed = max(0.01, 0.05 - elapsed)
+            time.sleep(sleep_needed)
+        return True
+
+    def _run_cv_loop(self):
+        """Standard OpenCV VideoCapture loop in dedicated thread for RTSP and generic streams."""
+        cap = None
+        try:
+            cap = cv2.VideoCapture(self.url)
+            if not cap.isOpened():
+                self.connected = False
+                return
+
+            self.connected = True
+            while self.is_running and cap.isOpened():
+                ret, frame = cap.read()
+                if not ret or frame is None:
+                    time.sleep(0.02)
+                    continue
+
+                h, w = frame.shape[:2]
+                if w > 1280 or h > 720:
+                    frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
+
+                with self.lock:
+                    self.latest_frame = frame
+                    self.last_frame_time = time.time()
+                time.sleep(0.015)
+        except Exception:
+            self.connected = False
+        finally:
+            if cap:
+                cap.release()
+
+    def isOpened(self) -> bool:
+        if not self.is_running:
+            return False
+        return self.connected and (time.time() - self.last_frame_time < 4.0)
+
+    def read(self) -> Tuple[bool, Optional[np.ndarray]]:
+        with self.lock:
+            if self.latest_frame is not None:
+                return True, self.latest_frame.copy()
+            return False, None
+
+    def release(self):
+        self.is_running = False
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=1.0)
+
+
+# Backward compatibility alias
+BufferlessCapture = UniversalStreamCapture
+
 
 
 def _ocr_worker_task(crop_bgr: np.ndarray, track_id: int) -> Tuple[int, str, float]:
@@ -255,8 +441,8 @@ class LiveVehicleRecognitionEngine:
         h, w = gray.shape[:2]
         candidates: List[Dict[str, Any]] = []
 
-        # 1. Deep Learning Detection (SSDLite) - Run on stride 3 or if cache empty
-        if self.frame_index % 3 == 0 or not self.cached_detections:
+        # 1. Deep Learning Detection (SSDLite) - Run on stride 6 (smooth real-time edge pace)
+        if self.frame_index % 6 == 0 or not self.cached_detections:
             ssdlite_results = self.detector.detect(frame, score_threshold=0.30)
             if ssdlite_results:
                 self.cached_detections = ssdlite_results
@@ -264,108 +450,39 @@ class LiveVehicleRecognitionEngine:
         for det in self.cached_detections:
             candidates.append(det)
 
-        # 2. Horizontal Sobel-X edge density for stationary vehicles and license plates
-        try:
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-            enhanced = clahe.apply(gray)
-            sobelx = cv2.Sobel(enhanced, cv2.CV_8U, 1, 0, ksize=3)
-            _, thresh = cv2.threshold(sobelx, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            kernel_wide = cv2.getStructuringElement(cv2.MORPH_RECT, (35, 7))
-            closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel_wide)
-            edge_contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # 2. Fast lightweight downsampled contour detection for plates/targets (only if fewer than 2 detections)
+        if len(candidates) < 2:
+            try:
+                small_w = w // 2
+                small_h = h // 2
+                small_gray = cv2.resize(gray, (small_w, small_h), interpolation=cv2.INTER_LINEAR)
+                sobelx = cv2.Sobel(small_gray, cv2.CV_8U, 1, 0, ksize=3)
+                _, thresh = cv2.threshold(sobelx, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                kernel_wide = cv2.getStructuringElement(cv2.MORPH_RECT, (18, 4))
+                closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel_wide)
+                edge_contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-            for ec in edge_contours:
-                x, y, cw, ch = cv2.boundingRect(ec)
-                aspect = cw / float(max(1, ch))
-                area = cw * ch
-                if (1.5 <= aspect <= 5.8) and (cw >= 55) and (ch >= 16) and (area >= 1200):
-                    pad_w = int(cw * 0.4)
-                    pad_h = int(ch * 1.5)
-                    vx1 = max(0, x - pad_w)
-                    vy1 = max(0, y - pad_h)
-                    vx2 = min(w, x + cw + pad_w)
-                    vy2 = min(h, y + ch + int(ch * 0.5))
-                    candidates.append({
-                        "box": (vx1, vy1, vx2 - vx1, vy2 - vy1),
-                        "label": "Sedan / Passenger Car",
-                        "confidence": 0.91,
-                        "source": "plate_edge"
-                    })
-        except Exception:
-            pass
-
-        # 3. Document / Plate Card Saliency (for handheld test cards, test sheets & isolated plates)
-        try:
-            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-            card_mask = cv2.inRange(hsv, np.array([0, 0, 140]), np.array([180, 55, 255]))
-            yellow_mask = cv2.inRange(hsv, np.array([15, 60, 100]), np.array([35, 255, 255]))
-            combined_card = cv2.bitwise_or(card_mask, yellow_mask)
-
-            kernel_card = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 11))
-            closed_card = cv2.morphologyEx(combined_card, cv2.MORPH_CLOSE, kernel_card)
-            card_cnts, _ = cv2.findContours(closed_card, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            for cc in card_cnts:
-                cx_c, cy_c, cw_c, ch_c = cv2.boundingRect(cc)
-                car = cw_c / float(max(1, ch_c))
-                c_area = cw_c * ch_c
-                # Match rectangular paper sheet or plate held in front of camera
-                if (1.2 <= car <= 5.5) and (5000 <= c_area <= 190000) and (cw_c >= 70) and (ch_c >= 40):
-                    if cw_c < 860 and ch_c < 470:
+                for ec in edge_contours:
+                    x, y, cw, ch = cv2.boundingRect(ec)
+                    aspect = cw / float(max(1, ch))
+                    area = cw * ch
+                    if (1.5 <= aspect <= 5.8) and (cw >= 28) and (ch >= 8) and (area >= 300):
+                        orig_x = max(0, (x - int(cw * 0.3)) * 2)
+                        orig_y = max(0, (y - int(ch * 1.2)) * 2)
+                        orig_w = min(w - orig_x, int(cw * 1.6) * 2)
+                        orig_h = min(h - orig_y, int(ch * 2.2) * 2)
                         candidates.append({
-                            "box": (cx_c, cy_c, cw_c, ch_c),
-                            "label": "Plate / Test Target",
-                            "confidence": 0.94,
-                            "source": "paper_target"
-                        })
-        except Exception:
-            pass
-
-        # 4. Motion segmentation (MOG2)
-        try:
-            blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-            fg_mask = self.bg_subtractor.apply(blurred)
-            kernel_m = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 5))
-            cleaned_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel_m)
-            contours, _ = cv2.findContours(cleaned_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-            for cnt in contours:
-                area = cv2.contourArea(cnt)
-                if area < 2500 or area > 140000:
-                    continue
-                bx, by, bw, bh = cv2.boundingRect(cnt)
-                if bw < 50 or bh < 35 or bw > 850 or bh > 480:
-                    continue
-                candidates.append({
-                    "box": (bx, by, bw, bh),
-                    "label": "Sedan / Passenger Car",
-                    "confidence": 0.90,
-                    "source": "motion"
-                })
-        except Exception:
-            pass
-
-        # 5. Vehicle body saliency (Otsu threshold on gray)
-        try:
-            _, otsu_th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            kernel_v = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 7))
-            closed_v = cv2.morphologyEx(otsu_th, cv2.MORPH_CLOSE, kernel_v)
-            v_contours, _ = cv2.findContours(closed_v, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            for vc in v_contours:
-                vx, vy, vw, vh = cv2.boundingRect(vc)
-                v_area = vw * vh
-                v_ar = vw / float(max(1, vh))
-                if 2500 <= v_area <= 180000 and 0.65 <= v_ar <= 4.8 and vw >= 50 and vh >= 35:
-                    if vw < 880 and vh < 500:
-                        candidates.append({
-                            "box": (vx, vy, vw, vh),
+                            "box": (orig_x, orig_y, orig_w, orig_h),
                             "label": "Sedan / Passenger Car",
-                            "confidence": 0.90,
-                            "source": "saliency"
+                            "confidence": 0.91,
+                            "source": "plate_edge"
                         })
-        except Exception:
-            pass
+                        if len(candidates) >= 4:
+                            break
+            except Exception:
+                pass
 
-        # 6. Viewfinder Reticle Fallback if no targets detected
+        # 3. Viewfinder Reticle Fallback if no targets detected
         if not candidates:
             cx, cy = w // 2, h // 2
             bw, bh = 360, 200
@@ -770,50 +887,155 @@ class LiveVehicleRecognitionEngine:
         cv2.putText(frame, bot_txt, (x1 + 5, bot_y2 - 3), cv2.FONT_HERSHEY_SIMPLEX, 0.34, (6, 182, 212), 1, cv2.LINE_AA)
 
 
-class BufferlessCapture:
+class UniversalStreamCapture:
     """
-    Dedicated background reader thread that constantly grabs the latest frame from an RTSP / HTTP video stream.
-    Drops all intermediate buffered frames in the socket queue, ensuring < 30ms transmission latency.
+    Universal High-Performance Stream Ingestion Capture Engine.
+    Handles:
+    1. Smartphone IP Webcam (HTTP multipart MJPEG e.g. http://<ip>:8080/video or /videofeed)
+    2. Smartphone Snapshot Polling (HTTP JPEG snapshots e.g. http://<ip>:8080/shot.jpg or /photo.jpg)
+    3. RTSP CCTV Video Streams (rtsp://...)
+    4. Automatically downscales incoming oversized frames (>1280x720) down to max 1280x720 to prevent CPU lockup.
+    5. Non-blocking reconnect loop with zero socket backlog.
     """
     def __init__(self, source: str):
-        self.source = source
-        self.cap = None
-        self.latest_frame: Optional[np.ndarray] = None
-        self.is_opened = False
+        self.source = str(source).strip()
         self.running = True
+        self.is_opened = False
+        self.latest_frame: Optional[np.ndarray] = None
         self.lock = threading.Lock()
-        
-        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
-            "rtsp_transport;udp|fflags;nobuffer|flags;low_delay|max_delay;0|probesize;32"
-        )
-        
+        self.status = "CONNECTING"
+        self.error_msg = ""
+        self.fps = 0.0
+        self.frame_count = 0
+        self.cap = None
+
+        self.thread = threading.Thread(target=self._worker_loop, daemon=True)
+        self.thread.start()
+
+    def _worker_loop(self):
+        url = self.source
+        if not url.startswith(("http://", "https://", "rtsp://")):
+            url = "http://" + url
+        if (url.startswith("http://") or url.startswith("https://")) and not any(k in url for k in ["/video", "/videofeed", ".mjpg", "/shot.jpg", "/photo.jpg", "/snapshot.jpg"]):
+            url = url.rstrip("/") + "/video"
+
+        is_http = url.startswith(("http://", "https://"))
+
+        while self.running:
+            if is_http:
+                success = self._read_http_mjpeg(url)
+                if not success and self.running:
+                    # Auto-fallback to snapshot polling /shot.jpg
+                    base = re.sub(r'/(video|videofeed|mjpeg|mjpg).*$', '', url)
+                    shot_url = base + "/shot.jpg"
+                    success_snap = self._poll_http_snapshots(shot_url)
+                    if not success_snap and self.running:
+                        self._read_opencv(url)
+            else:
+                self._read_opencv(url)
+
+            if self.running:
+                time.sleep(1.0)
+
+    def _read_http_mjpeg(self, url: str) -> bool:
+        req = urllib.request.Request(url, headers={'User-Agent': 'UrbanTwinAI/2.0 (High-Speed Edge Streamer)'})
         try:
-            self.cap = cv2.VideoCapture(source, cv2.CAP_FFMPEG)
-        except Exception:
-            self.cap = cv2.VideoCapture(source)
-        if not self.cap or not self.cap.isOpened():
-            self.cap = cv2.VideoCapture(source)
-            
-        if self.cap and self.cap.isOpened():
+            with urllib.request.urlopen(req, timeout=3.5) as stream:
+                buffer = bytearray()
+                consecutive_fails = 0
+                while self.running:
+                    chunk = stream.read(16384)
+                    if not chunk:
+                        break
+                    buffer.extend(chunk)
+
+                    a = buffer.find(b'\xff\xd8')
+                    b = buffer.find(b'\xff\xd9')
+                    if a != -1 and b != -1 and b > a:
+                        jpg_data = buffer[a:b+2]
+                        buffer = buffer[b+2:]
+
+                        frame = cv2.imdecode(np.frombuffer(jpg_data, dtype=np.uint8), cv2.IMREAD_COLOR)
+                        if frame is not None and frame.size > 0:
+                            h, w = frame.shape[:2]
+                            if w > 1280 or h > 720:
+                                frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
+                            with self.lock:
+                                self.latest_frame = frame
+                                self.is_opened = True
+                                self.status = "STREAMING"
+                                self.frame_count += 1
+                            consecutive_fails = 0
+                        else:
+                            consecutive_fails += 1
+                            if consecutive_fails > 15:
+                                break
+                return self.frame_count > 0
+        except Exception as e:
+            self.error_msg = str(e)
+            return False
+
+    def _poll_http_snapshots(self, shot_url: str) -> bool:
+        req = urllib.request.Request(shot_url, headers={'User-Agent': 'UrbanTwinAI/2.0 (Snapshot Streamer)'})
+        got_any = False
+        consecutive_errors = 0
+        while self.running and consecutive_errors < 6:
+            t0 = time.time()
             try:
-                self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                with urllib.request.urlopen(req, timeout=2.0) as resp:
+                    data = resp.read()
+                    if data:
+                        frame = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR)
+                        if frame is not None and frame.size > 0:
+                            h, w = frame.shape[:2]
+                            if w > 1280 or h > 720:
+                                frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
+                            with self.lock:
+                                self.latest_frame = frame
+                                self.is_opened = True
+                                self.status = "STREAMING"
+                                self.frame_count += 1
+                            got_any = True
+                            consecutive_errors = 0
+            except Exception:
+                consecutive_errors += 1
+
+            elapsed = time.time() - t0
+            time.sleep(max(0.03, 0.05 - elapsed))
+        return got_any
+
+    def _read_opencv(self, src: str):
+        try:
+            cap = cv2.VideoCapture(src)
+            if not cap or not cap.isOpened():
+                return
+            try:
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             except Exception:
                 pass
-            self.is_opened = True
-            self.thread = threading.Thread(target=self._update, daemon=True)
-            self.thread.start()
-
-    def _update(self):
-        while self.running:
-            if not self.cap or not self.cap.isOpened():
-                time.sleep(0.05)
-                continue
-            ret, frame = self.cap.read()
-            if not ret or frame is None:
-                time.sleep(0.005)
-                continue
-            with self.lock:
-                self.latest_frame = frame
+            self.cap = cap
+            while self.running:
+                ret, frame = cap.read()
+                if not ret or frame is None:
+                    break
+                h, w = frame.shape[:2]
+                if w > 1280 or h > 720:
+                    frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
+                with self.lock:
+                    self.latest_frame = frame
+                    self.is_opened = True
+                    self.status = "STREAMING"
+                    self.frame_count += 1
+                time.sleep(0.01)
+        except Exception as e:
+            self.error_msg = str(e)
+        finally:
+            if self.cap:
+                try:
+                    self.cap.release()
+                except Exception:
+                    pass
+                self.cap = None
 
     def read(self) -> Tuple[bool, Optional[np.ndarray]]:
         with self.lock:
@@ -823,7 +1045,7 @@ class BufferlessCapture:
         return False, None
 
     def isOpened(self) -> bool:
-        return self.is_opened and (self.cap is not None and self.cap.isOpened())
+        return self.is_opened and self.running
 
     def release(self):
         self.running = False
@@ -832,9 +1054,12 @@ class BufferlessCapture:
                 self.cap.release()
             except Exception:
                 pass
-        self.cap = None
+            self.cap = None
         self.is_opened = False
 
+
+# Backward compatibility alias
+BufferlessCapture = UniversalStreamCapture
 
 class CameraStreamWorker:
     """
@@ -940,11 +1165,28 @@ class CameraStreamWorker:
 
     def configure(self, mode: str, source_url: str = ""):
         source_url = source_url.strip()
-        if mode == "phone_live" and source_url:
-            if not source_url.startswith(("http://", "https://", "rtsp://")):
-                source_url = "http://" + source_url
-            if not any(k in source_url for k in ["/video", "/videofeed", ".mjpg", "rtsp://"]):
-                source_url = source_url.rstrip("/") + "/video"
+        if mode in ("phone_live", "phone_ip"):
+            mode = "phone_live"
+            if source_url:
+                if not source_url.startswith(("http://", "https://", "rtsp://")):
+                    source_url = "http://" + source_url
+                if not any(k in source_url for k in ["/video", "/videofeed", ".mjpg", "rtsp://"]):
+                    source_url = source_url.rstrip("/") + "/video"
+
+        if mode == "video_file":
+            if not source_url:
+                pref = f"{self.camera_id}_2.mov.mp4"
+                pref_path = os.path.join(STREAMS_DIR, pref)
+                if os.path.exists(pref_path):
+                    source_url = pref_path
+                else:
+                    files = [f for f in os.listdir(STREAMS_DIR) if f.endswith(('.mp4', '.mov', '.avi'))]
+                    if files:
+                        source_url = os.path.join(STREAMS_DIR, files[0])
+            elif not os.path.isabs(source_url):
+                cand = os.path.join(STREAMS_DIR, source_url)
+                if os.path.exists(cand):
+                    source_url = cand
 
         with self.lock:
             self.mode = mode
@@ -1043,7 +1285,7 @@ class CameraStreamWorker:
                     self._draw_status_watermark(frame_bgr, "WAITING FOR BROWSER CAMERA STREAM...")
 
             # 3. Phone Live Stream Mode (Bufferless zero-latency capture)
-            elif mode == "phone_live" and source:
+            elif mode in ("phone_live", "phone_ip") and source:
                 try:
                     if cap is None or current_cap_url != source or not isinstance(cap, BufferlessCapture):
                         if cap:
@@ -1070,40 +1312,35 @@ class CameraStreamWorker:
                     frame_bgr, detections = self.synthetic_gen.generate_frame()
                     self._draw_status_watermark(frame_bgr, f"ERROR: {str(e)[:30]}")
 
-            # 4. Video File Ingestion Mode (Real-Time Clock Synchronized Playback)
+            # 4. Video File Ingestion Mode (Smooth real-time playback without destructive seeks)
             elif mode == "video_file" and source:
                 try:
-                    if cap is None or current_cap_url != source or isinstance(cap, BufferlessCapture):
+                    if cap is None or current_cap_url != source:
                         if cap:
                             cap.release()
                         cap = cv2.VideoCapture(source)
                         current_cap_url = source
                         v_fps = cap.get(cv2.CAP_PROP_FPS) if cap and cap.isOpened() else 25.0
-                        self.video_fps = v_fps if (5.0 <= v_fps <= 120.0) else 25.0
+                        self.video_fps = v_fps if (5.0 <= v_fps <= 60.0) else 25.0
                         self.video_total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) if cap and cap.isOpened() else 0
-                        self.video_start_time = time.time()
 
                     if cap and cap.isOpened():
-                        # Synchronize video position to wall clock to guarantee natural 1.0x real-time playback
-                        v_elapsed = time.time() - self.video_start_time
-                        target_frame = int(v_elapsed * self.video_fps)
-
-                        if self.video_total_frames > 0 and target_frame >= self.video_total_frames:
-                            self.video_start_time = time.time()
-                            target_frame = 0
-                            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-
-                        cur_pos = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
-                        if target_frame > cur_pos + 1 and (self.video_total_frames <= 0 or target_frame < self.video_total_frames):
-                            cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
-
                         ret, raw_frame = cap.read()
+                        if not ret or raw_frame is None:
+                            # Reached end of video file: rewind smoothly to start
+                            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                            ret, raw_frame = cap.read()
+
                         if ret and raw_frame is not None:
+                            # Resize 4K/1080p down to 1280x720 immediately to save 90% CPU
+                            h, w = raw_frame.shape[:2]
+                            if w > 1280 or h > 720:
+                                raw_frame = cv2.resize(raw_frame, (1280, 720), interpolation=cv2.INTER_AREA)
+
                             frame_bgr, detections = self._annotate_external_frame(raw_frame)
                             self.status = "STREAMING"
                         else:
-                            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                            self.video_start_time = time.time()
+                            self.status = "WAITING_FRAME"
                             time.sleep(0.02)
                     else:
                         self.status = "SOURCE_UNREACHABLE"
@@ -1259,7 +1496,7 @@ class VideoIngestionService:
                     b"--frame\r\n"
                     b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
                 )
-            time.sleep(0.012)
+            time.sleep(0.033)
 
     def get_latest_snapshot(self, camera_id: str) -> Optional[bytes]:
         worker = self.get_worker(camera_id)

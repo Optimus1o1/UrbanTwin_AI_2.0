@@ -24,6 +24,8 @@
   let cameraTarget = new THREE.Vector3(0, 0, 0);
   let cameraPosTarget = new THREE.Vector3(0, 38, 54);
   let clock = new THREE.Clock();
+  const _curPos = new THREE.Vector3();
+  const _perp = new THREE.Vector3();
 
   // Mouse Interaction State
   let isDragging = false;
@@ -88,7 +90,7 @@
     // 3. Renderer with optimized Pixel Ratio
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
-    const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.0 : 1.1);
+    const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.0 : 1.05);
     renderer.setPixelRatio(dpr);
     renderer.shadowMap.enabled = false; // Disable expensive shadow map recalculation
     container.appendChild(renderer.domElement);
@@ -428,14 +430,13 @@
         p.progress = 0.0;
       }
 
-      // Position along road segment
-      const curPos = new THREE.Vector3().lerpVectors(rData.startVec, rData.endVec, p.progress);
-      // Lateral lane offset
-      const perp = new THREE.Vector3(-rData.dir.z, 0, rData.dir.x).multiplyScalar(p.laneOffset);
-      curPos.add(perp);
-      curPos.y = p.offsetY;
+      // Position along road segment (zero GC allocation)
+      _curPos.lerpVectors(rData.startVec, rData.endVec, p.progress);
+      _perp.set(-rData.dir.z, 0, rData.dir.x).multiplyScalar(p.laneOffset);
+      _curPos.add(_perp);
+      _curPos.y = p.offsetY;
 
-      p.mesh.position.copy(curPos);
+      p.mesh.position.copy(_curPos);
 
       // Color particle based on road congestion
       if (rData.congestion > 65) {

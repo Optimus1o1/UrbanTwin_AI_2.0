@@ -68,6 +68,13 @@
       touch-action: manipulation;
     }
 
+    /* Performance: Cap Gaussian blurs to 8px max to prevent GPU compositor drag */
+    [class*="backdrop-blur"] {
+      backdrop-filter: blur(8px) !important;
+      -webkit-backdrop-filter: blur(8px) !important;
+      transform: translateZ(0);
+    }
+
     .pb-safe {
       padding-bottom: env(safe-area-inset-bottom, 0px);
     }
@@ -2121,6 +2128,11 @@
                     <span>Ingest</span>
                   </button>
                 </div>
+                <div class="flex flex-wrap items-center gap-1.5 text-[10px] text-white/60 pt-1">
+                  <span class="text-white/40">Demo Videos:</span>
+                  <button type="button" onclick="loadSampleVideo('CAM_01', 'CAM_01_2.mov.mp4')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white font-mono flex items-center space-x-1 shadow-sm"><i class="fa-solid fa-play text-[9px] mr-1 text-emerald-400"></i>Sample 1 (Kolkata Traffic)</button>
+                  <button type="button" onclick="loadSampleVideo('CAM_01', 'CAM_01_1.mov.mp4')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white font-mono flex items-center space-x-1 shadow-sm"><i class="fa-solid fa-play text-[9px] mr-1 text-emerald-400"></i>Sample 2 (City Corridor)</button>
+                </div>
               </div>
             </div>
           </div>
@@ -2269,6 +2281,11 @@
                     <i class="fa-solid fa-upload"></i>
                     <span>Ingest</span>
                   </button>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5 text-[10px] text-white/60 pt-1">
+                  <span class="text-white/40">Demo Videos:</span>
+                  <button type="button" onclick="loadSampleVideo('CAM_02', 'CAM_02_2.mov.mp4')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white font-mono flex items-center space-x-1 shadow-sm"><i class="fa-solid fa-play text-[9px] mr-1 text-emerald-400"></i>Sample 1 (EM Bypass)</button>
+                  <button type="button" onclick="loadSampleVideo('CAM_02', 'CAM_02_1.mov.mp4')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white font-mono flex items-center space-x-1 shadow-sm"><i class="fa-solid fa-play text-[9px] mr-1 text-emerald-400"></i>Sample 2 (Expressway)</button>
                 </div>
               </div>
             </div>
@@ -2550,8 +2567,8 @@
               <span class="text-white font-bold animate-pulse">AZIMUTH: LIVE</span>
             </div>
             
-            <div class="relative flex items-center justify-center w-[340px] h-[340px] sm:w-[380px] sm:h-[380px]">
-              <canvas id="pol-radar-canvas" width="380" height="380" class="rounded-full shadow-2xl bg-black border border-white/10"></canvas>
+            <div class="relative flex items-center justify-center max-w-full w-[280px] h-[280px] xs:w-[340px] xs:h-[340px] sm:w-[380px] sm:h-[380px]">
+              <canvas id="pol-radar-canvas" width="380" height="380" class="max-w-full max-h-full rounded-full shadow-2xl bg-black border border-white/10"></canvas>
             </div>
 
             <div class="w-full grid grid-cols-3 gap-2 pt-3 text-[10px] font-mono text-center border-t border-white/10 mt-3 text-zinc-400">

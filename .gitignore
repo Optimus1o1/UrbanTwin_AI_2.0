@@ -71,3 +71,7 @@ logs/
 # Stream uploads
 backend/data/streams/*
 !backend/data/streams/.gitkeep
+
+# Temporary scratch files
+scratch/
+

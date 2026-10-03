@@ -18,6 +18,7 @@
   let currentLookAt = new THREE.Vector3(0, 0, 0);
   let clock = new THREE.Clock();
   let chaseVehicle = null;
+  const LOOK_AT_VEC = new THREE.Vector3();
 
   // Camera Locations mapped to 3D Space Coordinates
   const CAMERA_NODES_CONFIG = [
@@ -58,7 +59,7 @@
     // Renderer with optimized Pixel Ratio (capped to 1.0-1.1 to eliminate high-DPI GPU overdraw lag)
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
     renderer.setSize(container.clientWidth, container.clientHeight);
-    const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.0 : 1.1);
+    const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.0 : 1.05);
     renderer.setPixelRatio(dpr);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
@@ -359,7 +360,7 @@
   // 3D VEHICLES CRUISING SIMULATION (Monochrome Palette)
   function initVehiclesSimulation() {
     const vehicleColors = [0xffffff, 0xe4e4e7, 0xd4d4d8, 0xa1a1aa, 0x71717a, 0x52525b, 0x3f3f46, 0x27272a];
-    const vehicleCount = 75;
+    const vehicleCount = 28;
 
     for (let i = 0; i < vehicleCount; i++) {
       const roadPoints = ROAD_NETWORKS[Math.floor(Math.random() * ROAD_NETWORKS.length)];
@@ -592,7 +593,8 @@
       v.mesh.position.copy(pt);
 
       const tangent = v.curve.getTangentAt(v.progress);
-      v.mesh.lookAt(pt.clone().add(tangent));
+      LOOK_AT_VEC.copy(pt).add(tangent);
+      v.mesh.lookAt(LOOK_AT_VEC);
     });
 
     // 3. Animate chase vehicle if active
@@ -602,7 +604,8 @@
       const pt = chaseVehicle.curve.getPointAt(chaseVehicle.progress);
       chaseVehicle.mesh.position.copy(pt);
       const tangent = chaseVehicle.curve.getTangentAt(chaseVehicle.progress);
-      chaseVehicle.mesh.lookAt(pt.clone().add(tangent));
+      LOOK_AT_VEC.copy(pt).add(tangent);
+      chaseVehicle.mesh.lookAt(LOOK_AT_VEC);
 
       if (cameraMode === 'chase') {
         targetCameraPos = { x: pt.x - tangent.x * 12, y: pt.y + 6.5, z: pt.z - tangent.z * 12 };
